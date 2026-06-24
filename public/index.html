@@ -2,46 +2,104 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>旭建設CW出勤簿アプリ</title>
   <style>
     :root{
       --blue:#0ea5e9; --blue-d:#0284c7; --blue-l:#bae6fd; --blue-bg:#f0f9ff;
       --ink:#0f172a; --gray:#64748b; --line:#e2e8f0;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
     *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-    body{margin:0; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
-      background:var(--blue-bg); color:var(--ink); padding-bottom:84px; font-size:15px;}
-    header{background:linear-gradient(135deg,var(--blue),var(--blue-d)); color:#fff;
-      padding:12px 16px; text-align:center; box-shadow:0 2px 8px rgba(2,132,199,.3);}
+    html{height:100%;}
+    body{
+      margin:0;
+      font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+      background:var(--blue-bg); color:var(--ink);
+      padding-bottom:calc(80px + var(--safe-bottom));
+      font-size:15px;
+      -webkit-text-size-adjust:100%;
+      overscroll-behavior-y:contain;
+    }
+    header{
+      background:linear-gradient(135deg,var(--blue),var(--blue-d)); color:#fff;
+      padding:12px 16px;
+      padding-top:calc(12px + env(safe-area-inset-top, 0px));
+      text-align:center; box-shadow:0 2px 8px rgba(2,132,199,.3);
+    }
     header h1{margin:0; font-size:17px; letter-spacing:.5px;}
     header p{margin:2px 0 0; font-size:11px; opacity:.9;}
-    .wrap{max-width:540px; margin:0 auto; padding:10px;}
-    .card{background:#fff; border-radius:14px; padding:4px 14px; margin-bottom:10px;
-      box-shadow:0 1px 4px rgba(15,23,42,.06); border:1px solid var(--line);}
+    .wrap{max-width:540px; margin:0 auto; padding:10px 12px;}
+    .card{
+      background:#fff; border-radius:16px; padding:4px 14px; margin-bottom:10px;
+      box-shadow:0 1px 6px rgba(15,23,42,.07); border:1px solid var(--line);
+    }
 
-    .item{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line);}
+    /* 行レイアウト */
+    .item{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line);}
     .item:last-child{border-bottom:none;}
-    .item > .lbl{flex:0 0 3.4em; font-size:14px; font-weight:700; color:var(--ink);
-      text-align:justify; text-align-last:justify;}
-    .item > .lbl.wide{flex:0 0 7.4em; text-align-last:left;}
+    .item > .lbl{
+      flex:0 0 3.4em; font-size:14px; font-weight:700; color:var(--ink);
+      text-align:justify; text-align-last:justify;
+    }
+    .item > .lbl.wide{flex:0 0 7.2em; text-align-last:left;}
     .item > .ctrl{flex:1; min-width:0;}
 
-    select,input[type=date]{width:100%; padding:11px 10px; font-size:16px; border:2px solid var(--line);
-      border-radius:10px; background:#fff; color:var(--ink); appearance:none;}
-    select:focus,input:focus{outline:none; border-color:var(--blue);}
+    /* セレクト・日付 */
+    .sel-wrap{position:relative;}
+    .sel-wrap::after{
+      content:''; pointer-events:none;
+      position:absolute; right:12px; top:50%; transform:translateY(-50%);
+      width:0; height:0;
+      border-left:5px solid transparent; border-right:5px solid transparent;
+      border-top:6px solid var(--gray);
+    }
+    select{
+      width:100%; padding:13px 36px 13px 12px; font-size:16px;
+      border:2px solid var(--line); border-radius:10px;
+      background:#fff; color:var(--ink);
+      appearance:none; -webkit-appearance:none;
+      touch-action:manipulation;
+    }
+    select:focus{outline:none; border-color:var(--blue);}
+    input[type=date]{
+      width:100%; padding:13px 12px; font-size:16px;
+      border:2px solid var(--line); border-radius:10px;
+      background:#fff; color:var(--ink);
+      appearance:none; -webkit-appearance:none;
+      touch-action:manipulation;
+    }
+    input[type=date]:focus{outline:none; border-color:var(--blue);}
 
-    .leave-chip{flex:0 0 auto; background:var(--blue-l); color:var(--blue-d); font-weight:700;
-      border-radius:20px; padding:6px 11px; font-size:13px; white-space:nowrap;}
+    .leave-chip{
+      flex:0 0 auto; background:var(--blue-l); color:var(--blue-d); font-weight:700;
+      border-radius:20px; padding:7px 11px; font-size:13px; white-space:nowrap;
+    }
     .leave-chip b{font-size:17px; margin:0 2px;}
 
+    /* 選択ボタン */
     .btns{display:grid; gap:7px;}
     .btns.two{grid-template-columns:1fr 1fr;}
     .btns.three{grid-template-columns:1fr 1fr 1fr;}
     .btns.four{grid-template-columns:1fr 1fr 1fr 1fr;}
-    .opt{padding:11px 4px; font-size:15px; font-weight:700; border:2px solid var(--line);
-      border-radius:10px; background:#fff; color:var(--gray); cursor:pointer; transition:.12s;}
-    .opt.on{background:var(--blue); color:#fff; border-color:var(--blue); box-shadow:0 2px 6px rgba(14,165,233,.4);}
+    .opt{
+      padding:13px 4px; font-size:15px; font-weight:700;
+      border:2px solid var(--line); border-radius:10px;
+      background:#fff; color:var(--gray); cursor:pointer;
+      transition:background .1s, color .1s, border-color .1s, box-shadow .1s;
+      touch-action:manipulation; user-select:none;
+      min-height:44px;
+    }
+    .opt:active{opacity:.75;}
+    .opt.on{
+      background:var(--blue); color:#fff; border-color:var(--blue);
+      box-shadow:0 2px 8px rgba(14,165,233,.35);
+    }
 
+    /* 現場エリア */
     .site-block{padding:10px 0; border-bottom:1px solid var(--line);}
     .site-block:last-child{border-bottom:none;}
     .site-row{display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin-top:8px;}
@@ -49,58 +107,115 @@
     .site-row select{flex:1;}
     .site-row .rlbl{flex:0 0 2.6em; font-size:13px; font-weight:700; color:var(--gray);
       text-align:justify; text-align-last:justify;}
-    .other-input{flex:1 1 100%; padding:11px 10px; font-size:16px; border:2px solid var(--line);
-      border-radius:10px; background:#fff; color:var(--ink);}
+    .other-input{
+      flex:1 1 100%; padding:13px 12px; font-size:16px;
+      border:2px solid var(--line); border-radius:10px; background:#fff; color:var(--ink);
+      touch-action:manipulation;
+    }
     .other-input:focus{outline:none; border-color:var(--blue);}
 
+    /* 残業時間 */
     .ot-times{padding:8px 0 2px;}
     .row2{display:flex; align-items:center; gap:8px; justify-content:center;}
-    .row2 .tilde{font-size:16px; color:var(--gray);}
-    .time-sel select{padding:9px 4px; font-size:15px; min-width:72px;}
+    .row2 .tilde{font-size:18px; color:var(--gray);}
+    .time-sel select{padding:11px 30px 11px 8px; font-size:15px; min-width:80px;}
 
-    .dist-display{width:100%; padding:11px 12px; font-size:19px; font-weight:700; text-align:right;
-      border:2px solid var(--line); border-radius:10px; background:#fff; cursor:pointer; color:var(--ink);}
-    .dist-display .unit{font-size:13px; color:var(--gray); margin-left:5px; font-weight:400;}
+    /* 距離（電卓ボタン） */
+    .dist-display{
+      width:100%; padding:13px 14px; font-size:20px; font-weight:700; text-align:right;
+      border:2px solid var(--line); border-radius:10px; background:#fff;
+      cursor:pointer; color:var(--ink);
+      touch-action:manipulation; user-select:none;
+      transition:border-color .1s;
+      min-height:48px;
+    }
+    .dist-display:active{border-color:var(--blue);}
+    .dist-display .unit{font-size:13px; color:var(--gray); margin-left:4px; font-weight:400;}
 
-    .pass-block{padding:9px 0;}
+    /* 同乗者 */
+    .pass-block{padding:10px 0;}
     .pass-head{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
     .pass-head .lbl{flex:0 0 3.4em; font-size:14px; font-weight:700;
       text-align:justify; text-align-last:justify;}
-    .add-btn{flex:1; width:100%; padding:9px; font-size:13px; font-weight:700; border:2px dashed var(--blue);
-      border-radius:10px; background:#fff; color:var(--blue-d); cursor:pointer;}
+    .add-btn{
+      flex:1; width:100%; padding:11px; font-size:13px; font-weight:700;
+      border:2px dashed var(--blue); border-radius:10px;
+      background:#fff; color:var(--blue-d); cursor:pointer;
+      touch-action:manipulation; min-height:44px;
+    }
     .passenger-row{display:flex; gap:7px; margin-top:7px; align-items:center; padding-left:calc(3.4em + 10px);}
     .passenger-row select{flex:1;}
-    .del-x{flex:0 0 auto; width:40px; height:42px; border:2px solid #fecaca; background:#fff;
-      color:#ef4444; border-radius:10px; font-size:18px; cursor:pointer;}
+    .del-x{
+      flex:0 0 auto; width:44px; height:44px;
+      border:2px solid #fecaca; background:#fff; color:#ef4444;
+      border-radius:10px; font-size:20px; cursor:pointer;
+      touch-action:manipulation;
+    }
 
     .hide{display:none !important;}
 
-    .footer{position:fixed; left:0; right:0; bottom:0; background:#fff; padding:10px 12px;
-      box-shadow:0 -2px 10px rgba(15,23,42,.1); border-top:1px solid var(--line);}
-    .submit{display:block; width:100%; max-width:540px; margin:0 auto; padding:15px;
-      font-size:18px; font-weight:800; color:#fff; background:linear-gradient(135deg,var(--blue),var(--blue-d));
-      border:none; border-radius:13px; cursor:pointer; box-shadow:0 4px 12px rgba(2,132,199,.4);}
-    .submit:disabled{opacity:.5;}
+    /* フッター（固定） */
+    .footer{
+      position:fixed; left:0; right:0; bottom:0; background:#fff;
+      padding:10px 12px;
+      padding-bottom:calc(10px + var(--safe-bottom));
+      box-shadow:0 -2px 12px rgba(15,23,42,.1); border-top:1px solid var(--line);
+    }
+    .submit{
+      display:block; width:100%; max-width:540px; margin:0 auto;
+      padding:16px; font-size:18px; font-weight:800; color:#fff;
+      background:linear-gradient(135deg,var(--blue),var(--blue-d));
+      border:none; border-radius:13px; cursor:pointer;
+      box-shadow:0 4px 14px rgba(2,132,199,.4);
+      touch-action:manipulation; min-height:54px;
+      transition:opacity .1s;
+    }
+    .submit:active{opacity:.85;}
+    .submit:disabled{opacity:.45;}
 
-    .modal{position:fixed; inset:0; background:rgba(15,23,42,.55); display:none;
-      align-items:flex-end; justify-content:center; z-index:50;}
-    .modal.show{display:flex;}
-    .calc{background:#fff; width:100%; max-width:420px; border-radius:20px 20px 0 0; padding:16px;}
-    .calc-head{font-size:14px; font-weight:700; margin-bottom:6px;}
-    .calc-screen{font-size:30px; font-weight:800; text-align:right; padding:12px 14px;
-      background:var(--blue-bg); border-radius:12px; margin-bottom:12px; min-height:54px;}
+    /* 電卓モーダル */
+    .modal{
+      position:fixed; inset:0; background:rgba(15,23,42,0);
+      display:flex; align-items:flex-end; justify-content:center;
+      z-index:50; pointer-events:none;
+      transition:background .25s;
+    }
+    .modal.show{background:rgba(15,23,42,.52); pointer-events:auto;}
+    .calc{
+      background:#fff; width:100%; max-width:440px;
+      border-radius:20px 20px 0 0; padding:12px 16px;
+      padding-bottom:calc(16px + var(--safe-bottom));
+      transform:translateY(100%);
+      transition:transform .3s cubic-bezier(.32,.72,0,1);
+    }
+    .modal.show .calc{transform:translateY(0);}
+    .drag-handle{width:36px; height:4px; background:var(--line); border-radius:2px; margin:0 auto 10px;}
+    .calc-head{font-size:14px; font-weight:700; margin-bottom:6px; color:var(--gray);}
+    .calc-screen{
+      font-size:32px; font-weight:800; text-align:right; padding:12px 14px;
+      background:var(--blue-bg); border-radius:12px; margin-bottom:12px; min-height:56px;
+    }
     .calc-screen .unit{font-size:15px; color:var(--gray);}
-    .keys{display:grid; grid-template-columns:repeat(3,1fr); gap:9px;}
-    .key{padding:17px 0; font-size:22px; font-weight:700; border:1px solid var(--line);
-      border-radius:13px; background:#fff; cursor:pointer;}
+    .keys{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+    .key{
+      padding:18px 0; font-size:22px; font-weight:700;
+      border:1px solid var(--line); border-radius:13px; background:#fff;
+      cursor:pointer; touch-action:manipulation; user-select:none;
+      transition:background .08s;
+    }
     .key:active{background:var(--blue-l);}
     .key.fn{background:#fef2f2; color:#ef4444;}
-    .key.ok{grid-column:span 3; background:var(--blue); color:#fff; border:none; font-size:19px;}
+    .key.ok{grid-column:span 3; background:var(--blue); color:#fff; border:none; font-size:19px; padding:18px;}
 
-    .toast{position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      background:rgba(15,23,42,.92); color:#fff; padding:22px 28px; border-radius:16px;
-      font-size:16px; text-align:center; z-index:99; display:none;}
-    .toast.show{display:block;}
+    /* トースト */
+    .toast{
+      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      background:rgba(15,23,42,.9); color:#fff; padding:20px 28px;
+      border-radius:16px; font-size:16px; text-align:center; z-index:99;
+      pointer-events:none; opacity:0; transition:opacity .2s;
+    }
+    .toast.show{opacity:1;}
+
     .admin-link{text-align:center; margin:18px 0 6px;}
     .admin-link a{font-size:9px; color:#cbd5e1; text-decoration:none;}
   </style>
@@ -113,10 +228,11 @@
 
   <div class="wrap">
 
+    <!-- お名前・日付 -->
     <div class="card">
       <div class="item">
         <div class="lbl">お名前</div>
-        <div class="ctrl">
+        <div class="ctrl sel-wrap">
           <select id="user" onchange="onUserChange()"><option value="">― 選択 ―</option></select>
         </div>
         <div class="leave-chip" id="leaveBox" style="display:none">有給残<b id="leaveVal">―</b>日</div>
@@ -127,6 +243,7 @@
       </div>
     </div>
 
+    <!-- 出勤・現場・残業・宿泊・車両 -->
     <div class="card">
       <div class="item">
         <div class="lbl">出勤</div>
@@ -167,9 +284,9 @@
       <div class="item ot-times hide" id="otArea" style="display:none">
         <div style="width:100%">
           <div class="row2">
-            <div class="time-sel"><select id="otSH"></select></div>
+            <div class="time-sel sel-wrap"><select id="otSH"></select></div>
             <span class="tilde">〜</span>
-            <div class="time-sel"><select id="otEH"></select></div>
+            <div class="time-sel sel-wrap"><select id="otEH"></select></div>
           </div>
         </div>
       </div>
@@ -204,6 +321,7 @@
       </div>
     </div>
 
+    <!-- 通勤距離・運転者・同乗者 -->
     <div class="card">
       <div class="item">
         <div class="lbl wide">自宅〜現場</div>
@@ -232,7 +350,7 @@
         </div>
       </div>
       <div class="item hide" id="driverArea" style="display:none">
-        <div style="width:100%">
+        <div style="width:100%" class="sel-wrap">
           <select id="driver"><option value="">― 運転者を選択 ―</option></select>
         </div>
       </div>
@@ -253,8 +371,10 @@
     <button class="submit" id="submitBtn" onclick="submit()">この内容で登録する</button>
   </div>
 
-  <div class="modal" id="calcModal">
+  <!-- 電卓モーダル -->
+  <div class="modal" id="calcModal" onclick="onModalBg(event)">
     <div class="calc">
+      <div class="drag-handle"></div>
       <div class="calc-head">距離を入力（km）</div>
       <div class="calc-screen"><span id="calcScreen">0</span><span class="unit"> km</span></div>
       <div class="keys">
@@ -362,8 +482,7 @@
       var sites = rec.site ? String(rec.site).split('、') : [];
       if(rec.attendance==='終日'){
         var modeVal = (rec.siteMode==='複数現場') ? '複数' : '単一';
-        selectOpt('sitemode', modeVal);
-        onSiteMode();
+        selectOpt('sitemode', modeVal); onSiteMode();
         if(modeVal==='複数'){ while(document.querySelectorAll('#siteList select').length < sites.length){ addSiteSelect(); } }
         var ss=document.querySelectorAll('#siteList select');
         sites.forEach(function(s,i){ if(ss[i]) setRowSite(ss[i], s); });
@@ -391,7 +510,11 @@
       var ps = rec.passengers ? String(rec.passengers).split('、') : [];
       document.getElementById('passengers').innerHTML='';
       if(ps.length===0){ addPassenger(); }
-      else { ps.forEach(function(){ addPassenger(); }); var pse=document.querySelectorAll('#passengers select'); ps.forEach(function(p,i){ if(pse[i]) pse[i].value=p; }); }
+      else {
+        ps.forEach(function(){ addPassenger(); });
+        var pse=document.querySelectorAll('#passengers select');
+        ps.forEach(function(p,i){ if(pse[i]) pse[i].value=p; });
+      }
 
       updateSubmitLabel();
     }
@@ -403,10 +526,11 @@
     }
     function getPick(g){ var b=document.querySelector('.opt[data-g="'+g+'"].on'); return b?b.getAttribute('data-v'):''; }
 
-    function addSiteRow(label, removable){
+    function makeSiteSelect(label, removable){
       var wrap=document.getElementById('siteList');
       var row=document.createElement('div'); row.className='site-row';
       if(label){ var l=document.createElement('div'); l.className='rlbl'; l.textContent=label; row.appendChild(l); }
+      var sw=document.createElement('div'); sw.className='sel-wrap'; sw.style.flex='1';
       var sel=document.createElement('select');
       sel.innerHTML='<option value="">― 現場を選択 ―</option>';
       SITES.forEach(function(s){ sel.add(new Option(s,s)); });
@@ -418,7 +542,7 @@
         other.classList.toggle('hide', !on);
         if(!on) other.value='';
       };
-      row.appendChild(sel);
+      sw.appendChild(sel); row.appendChild(sw);
       if(removable){
         var del=document.createElement('button'); del.className='del-x'; del.type='button'; del.textContent='×';
         del.onclick=function(){ row.remove(); };
@@ -426,22 +550,18 @@
       }
       row.appendChild(other);
       wrap.appendChild(row);
+      return sel;
     }
-    function addSiteSelect(){ addSiteRow('追加', true); }
+    function addSiteSelect(){ makeSiteSelect('追加', true); }
     function onSiteMode(){
       var mode=getPick('sitemode');
       var area=document.getElementById('siteArea');
       var addBtn=document.getElementById('siteAddBtn');
       document.getElementById('siteList').innerHTML='';
       if(mode==='単一'){
-        area.classList.remove('hide');
-        addSiteRow('', false);
-        addBtn.classList.add('hide');
+        area.classList.remove('hide'); makeSiteSelect('', false); addBtn.classList.add('hide');
       } else if(mode==='複数'){
-        area.classList.remove('hide');
-        addSiteRow('午前', false);
-        addSiteRow('午後', false);
-        addBtn.classList.remove('hide');
+        area.classList.remove('hide'); makeSiteSelect('午前', false); makeSiteSelect('午後', false); addBtn.classList.remove('hide');
       } else {
         area.classList.add('hide');
       }
@@ -453,12 +573,11 @@
       document.getElementById('siteArea').classList.add('hide');
       document.getElementById('siteAddBtn').classList.add('hide');
       document.getElementById('siteModeRow').classList.add('hide');
-
       if(att==='終日'){
         document.getElementById('siteModeRow').classList.remove('hide');
       } else if(att==='午前' || att==='午後'){
         document.getElementById('siteArea').classList.remove('hide');
-        addSiteRow('', false);
+        makeSiteSelect('', false);
       }
     }
     function getSites(){
@@ -470,9 +589,7 @@
           var t=row.querySelector('.other-input');
           var v=t?t.value.trim():'';
           if(v) arr.push(v);
-        } else if(sel.value){
-          arr.push(sel.value);
-        }
+        } else if(sel.value){ arr.push(sel.value); }
       });
       return arr;
     }
@@ -508,12 +625,14 @@
     function addPassenger(){
       var wrap=document.getElementById('passengers');
       var row=document.createElement('div'); row.className='passenger-row';
+      var sw=document.createElement('div'); sw.className='sel-wrap'; sw.style.flex='1';
       var sel=document.createElement('select');
       sel.innerHTML='<option value="">― 選択 ―</option>';
       USERS.forEach(function(u){ sel.add(new Option(u.name,u.name)); });
+      sw.appendChild(sel);
       var del=document.createElement('button'); del.className='del-x'; del.type='button'; del.textContent='×';
       del.onclick=function(){ row.remove(); };
-      row.appendChild(sel); row.appendChild(del); wrap.appendChild(row);
+      row.appendChild(sw); row.appendChild(del); wrap.appendChild(row);
     }
     function refreshPassengerOptions(){
       document.querySelectorAll('#passengers select').forEach(function(sel){
@@ -525,19 +644,40 @@
       var arr=[]; document.querySelectorAll('#passengers select').forEach(function(sel){ if(sel.value) arr.push(sel.value); }); return arr;
     }
 
-    function openCalc(target){ calcTarget=target||'distGenba'; calcBuf=document.getElementById(calcTarget).textContent||'0'; if(calcBuf==='―')calcBuf='0'; render(); document.getElementById('calcModal').classList.add('show'); }
-    function closeCalc(){ document.getElementById(calcTarget).textContent=trim(calcBuf); document.getElementById('calcModal').classList.remove('show'); }
+    /* 電卓 */
+    function openCalc(target){
+      calcTarget=target||'distGenba';
+      calcBuf=document.getElementById(calcTarget).textContent||'0';
+      if(calcBuf==='―') calcBuf='0';
+      render();
+      document.getElementById('calcModal').classList.add('show');
+      document.body.style.overflow='hidden';
+    }
+    function closeCalc(){
+      document.getElementById(calcTarget).textContent=trimVal(calcBuf);
+      document.getElementById('calcModal').classList.remove('show');
+      document.body.style.overflow='';
+    }
+    function onModalBg(e){ if(e.target===document.getElementById('calcModal')) closeCalc(); }
     function ck(k){
       if(k==='clear'){calcBuf='0';}
       else if(k==='back'){calcBuf=calcBuf.length>1?calcBuf.slice(0,-1):'0';}
-      else if(k==='.'){ if(calcBuf.indexOf('.')<0)calcBuf+='.'; }
+      else if(k==='.'){ if(calcBuf.indexOf('.')<0) calcBuf+='.'; }
       else { calcBuf=(calcBuf==='0')?k:calcBuf+k; }
       render();
     }
     function render(){ document.getElementById('calcScreen').textContent=calcBuf; }
-    function trim(v){ if(v.endsWith('.'))v=v.slice(0,-1); return v===''?'0':v; }
-    function toast(msg,ms){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); if(ms!==0) setTimeout(function(){t.classList.remove('show');},ms||1800); }
+    function trimVal(v){ if(v.endsWith('.'))v=v.slice(0,-1); return v===''?'0':v; }
 
+    /* トースト */
+    var toastTimer=null;
+    function toast(msg,ms){
+      var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+      if(toastTimer) clearTimeout(toastTimer);
+      if(ms!==0) toastTimer=setTimeout(function(){t.classList.remove('show');},ms||1800);
+    }
+
+    /* 送信 */
     function submit(){
       var name=document.getElementById('user').value;
       var date=document.getElementById('date').value;
@@ -545,9 +685,9 @@
 
       if(!name){alert('お名前を選択してください');return;}
       if(!date){alert('日付を選択してください');return;}
-
       var att=getPick('att');
       if(!att){alert('出勤（終日／午前／午後／休み）を選択してください');return;}
+
       var siteLabel='', siteModeLabel='', workDays=0;
       if(att==='休み'){
         siteLabel='休み'; siteModeLabel=''; workDays=0;
@@ -579,8 +719,7 @@
         site:siteLabel, workDays:workDays, overtime:ot,
         overtimeStart: ot==='あり'?(document.getElementById('otSH').value+'時'):'',
         overtimeEnd:   ot==='あり'?(document.getElementById('otEH').value+'時'):'',
-        stay:stay,
-        meal: stay==='あり' ? meal : '',
+        stay:stay, meal: stay==='あり' ? meal : '',
         carType:car,
         commuteGenba:document.getElementById('distGenba').textContent.replace('―','0'),
         commuteShugo:document.getElementById('distShugo').textContent.replace('―','0'),
@@ -595,9 +734,9 @@
       var method = editingId ? 'PUT' : 'POST';
 
       fetch(url, {
-        method: method,
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
+        method:method,
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(data)
       })
       .then(function(r){ return r.json(); })
       .then(function(res){
