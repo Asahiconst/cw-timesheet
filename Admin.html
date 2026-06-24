@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>管理画面 | 旭建設CW出勤簿アプリ</title>
+  <style>
+    :root{
+      --blue:#0ea5e9; --blue-d:#0284c7; --blue-l:#bae6fd; --blue-bg:#f0f9ff;
+      --ink:#0f172a; --gray:#64748b; --line:#e2e8f0;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0; font-family:"Yu Gothic UI","Hiragino Kaku Gothic ProN",sans-serif;
+      background:var(--blue-bg); color:var(--ink);}
+    header{background:linear-gradient(135deg,var(--blue),var(--blue-d)); color:#fff;
+      padding:16px 24px; display:flex; align-items:center; justify-content:space-between;}
+    header h1{margin:0; font-size:18px;}
+    .wrap{max-width:1800px; width:97%; margin:0 auto; padding:24px;}
+
+    /* ログイン */
+    .login{max-width:360px; margin:80px auto; background:#fff; border-radius:16px;
+      padding:32px; box-shadow:0 4px 20px rgba(2,132,199,.15); text-align:center;}
+    .login h2{margin:0 0 6px; font-size:20px;}
+    .login p{margin:0 0 22px; color:var(--gray); font-size:13px;}
+    .login input{width:100%; padding:13px; margin-bottom:12px; font-size:15px;
+      border:2px solid var(--line); border-radius:10px;}
+    .login input:focus{outline:none; border-color:var(--blue);}
+    .btn{padding:12px 18px; font-size:15px; font-weight:700; color:#fff;
+      background:linear-gradient(135deg,var(--blue),var(--blue-d)); border:none;
+      border-radius:10px; cursor:pointer;}
+    .btn:hover{opacity:.92;}
+    .btn.full{width:100%; padding:14px;}
+    .btn.sm{padding:8px 14px; font-size:13px;}
+    .btn.gray{background:#e2e8f0; color:var(--ink);}
+
+    /* タブ */
+    .tabs{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;}
+    .tab{padding:11px 18px; font-size:14px; font-weight:700; background:#fff; color:var(--gray);
+      border:2px solid var(--line); border-radius:10px; cursor:pointer;}
+    .tab.on{background:var(--blue); color:#fff; border-color:var(--blue);}
+
+    .panel{display:none;}
+    .panel.on{display:block;}
+    .card{background:#fff; border-radius:14px; padding:20px; margin-bottom:18px;
+      box-shadow:0 1px 4px rgba(15,23,42,.06); border:1px solid var(--line);}
+    .card h3{margin:0 0 14px; font-size:16px;}
+    .form-row{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:6px;}
+    .field{display:flex; flex-direction:column; gap:4px;}
+    .field label{font-size:12px; color:var(--gray); font-weight:700;}
+    .field input,.field select{padding:10px; font-size:14px; border:2px solid var(--line);
+      border-radius:8px; min-width:160px;}
+    .field input:focus,.field select:focus{outline:none; border-color:var(--blue);}
+
+    table{width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed;}
+    th,td{padding:7px 8px; text-align:left; border-bottom:1px solid var(--line);
+      white-space:normal; word-break:break-word; vertical-align:top;}
+    th{background:var(--blue-bg); color:var(--blue-d); font-size:11px;}
+    /* 出勤記録テーブルの列幅配分（合計しても横スクロールしないように） */
+    #recTable th:nth-child(1),#recTable td:nth-child(1){width:5%;}   /* 日付 */
+    #recTable th:nth-child(6),#recTable td:nth-child(6){width:3%;}   /* 出勤数 */
+    #recTable th:nth-child(7),#recTable td:nth-child(7){width:3%;}   /* 残業 */
+    #recTable th:nth-child(12),#recTable td:nth-child(12){width:5%;} /* 自宅〜現場 */
+    #recTable th:nth-child(13),#recTable td:nth-child(13){width:5%;} /* 自宅〜集合場所 */
+    tr:hover td{background:#f8fafc;}
+    .tag{display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;}
+    .tag.on{background:#dcfce7; color:#16a34a;} .tag.off{background:#fee2e2; color:#ef4444;}
+    .scroll{overflow-x:auto;}
+    .leave-input{width:70px; padding:6px; border:2px solid var(--line); border-radius:6px; font-size:13px;}
+    .toast{position:fixed; top:20px; right:20px; background:rgba(15,23,42,.92); color:#fff;
+      padding:14px 20px; border-radius:10px; font-size:14px; display:none; z-index:99;}
+    .toast.show{display:block;}
+    .muted{color:var(--gray); font-size:13px;}
+  </style>
+</head>
+<body>
+
+  <!-- ログイン -->
+  <div id="loginView">
+    <div class="login">
+      <h2>管理画面ログイン</h2>
+      <p>旭建設CW出勤簿アプリ</p>
+      <input type="text" id="loginId" placeholder="ログインID" autocomplete="username">
+      <input type="password" id="loginPass" placeholder="パスワード" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn full" onclick="doLogin()">ログイン</button>
+      <p id="loginErr" style="color:#ef4444; margin-top:14px; display:none;">IDまたはパスワードが違います</p>
+    </div>
+  </div>
+
+  <!-- 管理画面 -->
+  <div id="adminView" style="display:none;">
+    <header>
+      <h1>旭建設CW出勤簿アプリ ― 管理画面</h1>
+      <button class="btn sm gray" onclick="location.reload()">ログアウト</button>
+    </header>
+    <div class="wrap">
+      <div class="tabs">
+        <button class="tab on" onclick="showTab('records',this)">出勤記録の閲覧</button>
+        <button class="tab" onclick="showTab('users',this)">ユーザー管理</button>
+        <button class="tab" onclick="showTab('sites',this)">現場管理</button>
+      </div>
+
+      <!-- 出勤記録 -->
+      <div class="panel on" id="panel-records">
+        <div class="card">
+          <h3>出勤記録の閲覧</h3>
+          <div class="form-row">
+            <div class="field"><label>氏名で絞り込み</label>
+              <select id="fName"><option value="">すべて</option></select></div>
+            <div class="field"><label>日付（から）</label><input type="date" id="fFrom"></div>
+            <div class="field"><label>日付（まで）</label><input type="date" id="fTo"></div>
+            <button class="btn sm" onclick="loadRecords()">表示</button>
+            <button class="btn sm gray" onclick="clearFilter()">クリア</button>
+          </div>
+          <p class="muted" id="recCount"></p>
+          <div class="scroll">
+            <table id="recTable">
+              <thead><tr>
+                <th>日付</th><th>氏名</th><th>出勤</th><th>現場種別</th><th>現場</th><th>出勤数</th>
+                <th>残業</th><th>残業時間</th><th>宿泊</th><th>食事</th><th>車両</th>
+                <th>自宅〜現場km</th><th>自宅〜集合場所km</th><th>運転者</th><th>同乗者</th><th>登録日時</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ユーザー管理 -->
+      <div class="panel" id="panel-users">
+        <div class="card">
+          <h3>ユーザー登録</h3>
+          <div class="form-row">
+            <div class="field"><label>氏名</label><input type="text" id="uName" placeholder="例：濵田 光洋"></div>
+            <div class="field"><label>有給残日数</label><input type="number" id="uLeave" value="0" step="0.5"></div>
+            <button class="btn sm" onclick="addUser()">＋ 登録する</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>登録済みユーザー（有給残日数の編集もここで）</h3>
+          <div class="scroll">
+            <table id="userTable">
+              <thead><tr><th>氏名</th><th>有給残日数</th><th>状態</th><th>操作</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 現場管理 -->
+      <div class="panel" id="panel-sites">
+        <div class="card">
+          <h3>現場名 登録</h3>
+          <div class="form-row">
+            <div class="field"><label>現場名</label><input type="text" id="sName" placeholder="例：〇〇橋梁補修工事"></div>
+            <button class="btn sm" onclick="addSite()">＋ 登録する</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>登録済み現場</h3>
+          <div class="scroll">
+            <table id="siteTable">
+              <thead><tr><th>現場名</th><th>状態</th><th>操作</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1800); }
+
+    function doLogin(){
+      var id=document.getElementById('loginId').value;
+      var pass=document.getElementById('loginPass').value;
+      google.script.run.withSuccessHandler(function(ok){
+        if(ok){
+          document.getElementById('loginView').style.display='none';
+          document.getElementById('adminView').style.display='block';
+          loadAll();
+        } else {
+          document.getElementById('loginErr').style.display='block';
+        }
+      }).adminLogin(id, pass);
+    }
+
+    function showTab(name, el){
+      document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+      el.classList.add('on');
+      document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
+      document.getElementById('panel-'+name).classList.add('on');
+    }
+
+    function loadAll(){ loadUsers(); loadSites(); loadRecords(); }
+
+    /* ユーザー */
+    function loadUsers(){
+      google.script.run.withSuccessHandler(function(list){
+        var tb=document.querySelector('#userTable tbody'); tb.innerHTML='';
+        var fName=document.getElementById('fName'); fName.innerHTML='<option value="">すべて</option>';
+        list.forEach(function(u){
+          var tr=document.createElement('tr');
+          tr.innerHTML =
+            '<td>'+u.name+'</td>'+
+            '<td><input class="leave-input" type="number" step="0.5" value="'+u.leave+'" id="lv_'+u.id+'"> '+
+              '<button class="btn sm" onclick="saveLeave(\''+u.id+'\')">保存</button></td>'+
+            '<td>'+(u.active?'<span class="tag on">有効</span>':'<span class="tag off">無効</span>')+'</td>'+
+            '<td><button class="btn sm gray" onclick="toggleUser(\''+u.id+'\','+(!u.active)+')">'+(u.active?'無効化':'有効化')+'</button></td>';
+          tb.appendChild(tr);
+          if(u.active) fName.add(new Option(u.name, u.name));
+        });
+      }).adminGetUsers();
+    }
+    function addUser(){
+      var n=document.getElementById('uName').value.trim();
+      var l=document.getElementById('uLeave').value;
+      if(!n){ alert('氏名を入力してください'); return; }
+      google.script.run.withSuccessHandler(function(){ toast('登録しました'); document.getElementById('uName').value=''; document.getElementById('uLeave').value='0'; loadUsers(); }).adminAddUser(n, l);
+    }
+    function saveLeave(id){
+      var v=document.getElementById('lv_'+id).value;
+      google.script.run.withSuccessHandler(function(){ toast('有給残日数を更新しました'); }).adminUpdateLeave(id, v);
+    }
+    function toggleUser(id, active){
+      google.script.run.withSuccessHandler(function(){ loadUsers(); }).adminToggleUser(id, active);
+    }
+
+    /* 現場 */
+    function loadSites(){
+      google.script.run.withSuccessHandler(function(list){
+        var tb=document.querySelector('#siteTable tbody'); tb.innerHTML='';
+        list.forEach(function(s){
+          var tr=document.createElement('tr');
+          tr.innerHTML =
+            '<td>'+s.name+'</td>'+
+            '<td>'+(s.active?'<span class="tag on">有効</span>':'<span class="tag off">無効</span>')+'</td>'+
+            '<td><button class="btn sm gray" onclick="toggleSite(\''+s.id+'\','+(!s.active)+')">'+(s.active?'無効化':'有効化')+'</button></td>';
+          tb.appendChild(tr);
+        });
+      }).adminGetSites();
+    }
+    function addSite(){
+      var n=document.getElementById('sName').value.trim();
+      if(!n){ alert('現場名を入力してください'); return; }
+      google.script.run.withSuccessHandler(function(){ toast('登録しました'); document.getElementById('sName').value=''; loadSites(); }).adminAddSite(n);
+    }
+    function toggleSite(id, active){
+      google.script.run.withSuccessHandler(function(){ loadSites(); }).adminToggleSite(id, active);
+    }
+
+    /* 出勤記録 */
+    function clearFilter(){ document.getElementById('fName').value=''; document.getElementById('fFrom').value=''; document.getElementById('fTo').value=''; loadRecords(); }
+    function loadRecords(){
+      var filter={
+        name: document.getElementById('fName').value,
+        dateFrom: document.getElementById('fFrom').value,
+        dateTo: document.getElementById('fTo').value
+      };
+      google.script.run.withSuccessHandler(function(list){
+        var tb=document.querySelector('#recTable tbody'); tb.innerHTML='';
+        document.getElementById('recCount').textContent = list.length + ' 件';
+        list.forEach(function(r){
+          var ot=(r.overtime==='あり')?(r.otStart+'〜'+r.otEnd):'';
+          var tr=document.createElement('tr');
+          tr.innerHTML =
+            '<td>'+r.date+'</td><td>'+r.name+'</td><td>'+r.attendance+'</td>'+
+            '<td>'+(r.siteMode||'')+'</td><td>'+(r.site||'')+'</td><td>'+(r.workDays!=null?r.workDays:'')+'</td>'+
+            '<td>'+r.overtime+'</td><td>'+ot+'</td><td>'+(r.stay||'')+'</td><td>'+(r.meal||'')+'</td>'+
+            '<td>'+r.carType+'</td>'+
+            '<td>'+(r.commuteGenba||'')+'</td><td>'+(r.commuteShugo||'')+'</td>'+
+            '<td>'+r.driver+'</td><td>'+r.passengers+'</td><td>'+r.created+'</td>';
+          tb.appendChild(tr);
+        });
+      }).adminGetRecords(filter);
+    }
+  </script>
+</body>
+</html>
