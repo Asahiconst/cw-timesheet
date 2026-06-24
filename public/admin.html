@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <base target="_top">
   <meta charset="utf-8">
   <title>管理画面 | 旭建設CW出勤簿アプリ</title>
   <style>
@@ -17,7 +16,6 @@
     header h1{margin:0; font-size:18px;}
     .wrap{max-width:1800px; width:97%; margin:0 auto; padding:24px;}
 
-    /* ログイン */
     .login{max-width:360px; margin:80px auto; background:#fff; border-radius:16px;
       padding:32px; box-shadow:0 4px 20px rgba(2,132,199,.15); text-align:center;}
     .login h2{margin:0 0 6px; font-size:20px;}
@@ -33,7 +31,6 @@
     .btn.sm{padding:8px 14px; font-size:13px;}
     .btn.gray{background:#e2e8f0; color:var(--ink);}
 
-    /* タブ */
     .tabs{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;}
     .tab{padding:11px 18px; font-size:14px; font-weight:700; background:#fff; color:var(--gray);
       border:2px solid var(--line); border-radius:10px; cursor:pointer;}
@@ -55,12 +52,11 @@
     th,td{padding:7px 8px; text-align:left; border-bottom:1px solid var(--line);
       white-space:normal; word-break:break-word; vertical-align:top;}
     th{background:var(--blue-bg); color:var(--blue-d); font-size:11px;}
-    /* 出勤記録テーブルの列幅配分（合計しても横スクロールしないように） */
-    #recTable th:nth-child(1),#recTable td:nth-child(1){width:5%;}   /* 日付 */
-    #recTable th:nth-child(6),#recTable td:nth-child(6){width:3%;}   /* 出勤数 */
-    #recTable th:nth-child(7),#recTable td:nth-child(7){width:3%;}   /* 残業 */
-    #recTable th:nth-child(12),#recTable td:nth-child(12){width:5%;} /* 自宅〜現場 */
-    #recTable th:nth-child(13),#recTable td:nth-child(13){width:5%;} /* 自宅〜集合場所 */
+    #recTable th:nth-child(1),#recTable td:nth-child(1){width:5%;}
+    #recTable th:nth-child(6),#recTable td:nth-child(6){width:3%;}
+    #recTable th:nth-child(7),#recTable td:nth-child(7){width:3%;}
+    #recTable th:nth-child(12),#recTable td:nth-child(12){width:5%;}
+    #recTable th:nth-child(13),#recTable td:nth-child(13){width:5%;}
     tr:hover td{background:#f8fafc;}
     .tag{display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;}
     .tag.on{background:#dcfce7; color:#16a34a;} .tag.off{background:#fee2e2; color:#ef4444;}
@@ -74,7 +70,6 @@
 </head>
 <body>
 
-  <!-- ログイン -->
   <div id="loginView">
     <div class="login">
       <h2>管理画面ログイン</h2>
@@ -87,11 +82,10 @@
     </div>
   </div>
 
-  <!-- 管理画面 -->
   <div id="adminView" style="display:none;">
     <header>
       <h1>旭建設CW出勤簿アプリ ― 管理画面</h1>
-      <button class="btn sm gray" onclick="location.reload()">ログアウト</button>
+      <button class="btn sm gray" onclick="logout()">ログアウト</button>
     </header>
     <div class="wrap">
       <div class="tabs">
@@ -100,7 +94,6 @@
         <button class="tab" onclick="showTab('sites',this)">現場管理</button>
       </div>
 
-      <!-- 出勤記録 -->
       <div class="panel on" id="panel-records">
         <div class="card">
           <h3>出勤記録の閲覧</h3>
@@ -126,7 +119,6 @@
         </div>
       </div>
 
-      <!-- ユーザー管理 -->
       <div class="panel" id="panel-users">
         <div class="card">
           <h3>ユーザー登録</h3>
@@ -147,7 +139,6 @@
         </div>
       </div>
 
-      <!-- 現場管理 -->
       <div class="panel" id="panel-sites">
         <div class="card">
           <h3>現場名 登録</h3>
@@ -175,18 +166,42 @@
   <script>
     function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1800); }
 
+    function getToken(){ return sessionStorage.getItem('adminToken') || ''; }
+
+    function api(path, opts){
+      opts = opts || {};
+      opts.headers = Object.assign({ 'Authorization': 'Bearer ' + getToken() }, opts.headers || {});
+      return fetch('/api' + path, opts).then(function(r){
+        if(r.status === 401){ logout(); throw new Error('セッション切れ。再ログインしてください。'); }
+        return r.json();
+      });
+    }
+
+    function logout(){
+      sessionStorage.removeItem('adminToken');
+      location.reload();
+    }
+
     function doLogin(){
       var id=document.getElementById('loginId').value;
       var pass=document.getElementById('loginPass').value;
-      google.script.run.withSuccessHandler(function(ok){
-        if(ok){
+      fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: id, pass: pass})
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if(res.ok){
+          sessionStorage.setItem('adminToken', res.token);
           document.getElementById('loginView').style.display='none';
           document.getElementById('adminView').style.display='block';
           loadAll();
         } else {
           document.getElementById('loginErr').style.display='block';
         }
-      }).adminLogin(id, pass);
+      })
+      .catch(function(e){ alert('エラー: '+e.message); });
     }
 
     function showTab(name, el){
@@ -198,9 +213,8 @@
 
     function loadAll(){ loadUsers(); loadSites(); loadRecords(); }
 
-    /* ユーザー */
     function loadUsers(){
-      google.script.run.withSuccessHandler(function(list){
+      api('/admin/users').then(function(list){
         var tb=document.querySelector('#userTable tbody'); tb.innerHTML='';
         var fName=document.getElementById('fName'); fName.innerHTML='<option value="">すべて</option>';
         list.forEach(function(u){
@@ -214,25 +228,42 @@
           tb.appendChild(tr);
           if(u.active) fName.add(new Option(u.name, u.name));
         });
-      }).adminGetUsers();
+      }).catch(function(e){ toast(e.message); });
     }
+
     function addUser(){
       var n=document.getElementById('uName').value.trim();
       var l=document.getElementById('uLeave').value;
       if(!n){ alert('氏名を入力してください'); return; }
-      google.script.run.withSuccessHandler(function(){ toast('登録しました'); document.getElementById('uName').value=''; document.getElementById('uLeave').value='0'; loadUsers(); }).adminAddUser(n, l);
-    }
-    function saveLeave(id){
-      var v=document.getElementById('lv_'+id).value;
-      google.script.run.withSuccessHandler(function(){ toast('有給残日数を更新しました'); }).adminUpdateLeave(id, v);
-    }
-    function toggleUser(id, active){
-      google.script.run.withSuccessHandler(function(){ loadUsers(); }).adminToggleUser(id, active);
+      api('/admin/users', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:n, leave:l})
+      }).then(function(){ toast('登録しました'); document.getElementById('uName').value=''; document.getElementById('uLeave').value='0'; loadUsers(); })
+      .catch(function(e){ toast(e.message); });
     }
 
-    /* 現場 */
+    function saveLeave(id){
+      var v=document.getElementById('lv_'+id).value;
+      api('/admin/users/'+id+'/leave', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({leave:v})
+      }).then(function(){ toast('有給残日数を更新しました'); })
+      .catch(function(e){ toast(e.message); });
+    }
+
+    function toggleUser(id, active){
+      api('/admin/users/'+id+'/active', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({active:active})
+      }).then(function(){ loadUsers(); })
+      .catch(function(e){ toast(e.message); });
+    }
+
     function loadSites(){
-      google.script.run.withSuccessHandler(function(list){
+      api('/admin/sites').then(function(list){
         var tb=document.querySelector('#siteTable tbody'); tb.innerHTML='';
         list.forEach(function(s){
           var tr=document.createElement('tr');
@@ -242,26 +273,40 @@
             '<td><button class="btn sm gray" onclick="toggleSite(\''+s.id+'\','+(!s.active)+')">'+(s.active?'無効化':'有効化')+'</button></td>';
           tb.appendChild(tr);
         });
-      }).adminGetSites();
+      }).catch(function(e){ toast(e.message); });
     }
+
     function addSite(){
       var n=document.getElementById('sName').value.trim();
       if(!n){ alert('現場名を入力してください'); return; }
-      google.script.run.withSuccessHandler(function(){ toast('登録しました'); document.getElementById('sName').value=''; loadSites(); }).adminAddSite(n);
-    }
-    function toggleSite(id, active){
-      google.script.run.withSuccessHandler(function(){ loadSites(); }).adminToggleSite(id, active);
+      api('/admin/sites', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:n})
+      }).then(function(){ toast('登録しました'); document.getElementById('sName').value=''; loadSites(); })
+      .catch(function(e){ toast(e.message); });
     }
 
-    /* 出勤記録 */
+    function toggleSite(id, active){
+      api('/admin/sites/'+id+'/active', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({active:active})
+      }).then(function(){ loadSites(); })
+      .catch(function(e){ toast(e.message); });
+    }
+
     function clearFilter(){ document.getElementById('fName').value=''; document.getElementById('fFrom').value=''; document.getElementById('fTo').value=''; loadRecords(); }
+
     function loadRecords(){
-      var filter={
-        name: document.getElementById('fName').value,
-        dateFrom: document.getElementById('fFrom').value,
-        dateTo: document.getElementById('fTo').value
-      };
-      google.script.run.withSuccessHandler(function(list){
+      var name=document.getElementById('fName').value;
+      var from=document.getElementById('fFrom').value;
+      var to=document.getElementById('fTo').value;
+      var q=new URLSearchParams();
+      if(name) q.set('name',name);
+      if(from) q.set('from',from);
+      if(to)   q.set('to',to);
+      api('/admin/records'+(q.toString()?'?'+q.toString():'')).then(function(list){
         var tb=document.querySelector('#recTable tbody'); tb.innerHTML='';
         document.getElementById('recCount').textContent = list.length + ' 件';
         list.forEach(function(r){
@@ -276,7 +321,7 @@
             '<td>'+r.driver+'</td><td>'+r.passengers+'</td><td>'+r.created+'</td>';
           tb.appendChild(tr);
         });
-      }).adminGetRecords(filter);
+      }).catch(function(e){ toast(e.message); });
     }
   </script>
 </body>

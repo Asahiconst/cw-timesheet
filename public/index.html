@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <base target="_top">
   <meta charset="utf-8">
   <title>旭建設CW出勤簿アプリ</title>
   <style>
@@ -20,7 +19,6 @@
     .card{background:#fff; border-radius:14px; padding:4px 14px; margin-bottom:10px;
       box-shadow:0 1px 4px rgba(15,23,42,.06); border:1px solid var(--line);}
 
-    /* 横並び1項目 */
     .item{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line);}
     .item:last-child{border-bottom:none;}
     .item > .lbl{flex:0 0 3.4em; font-size:14px; font-weight:700; color:var(--ink);
@@ -36,7 +34,6 @@
       border-radius:20px; padding:6px 11px; font-size:13px; white-space:nowrap;}
     .leave-chip b{font-size:17px; margin:0 2px;}
 
-    /* 選択ボタン（未選択=白／選択=青） */
     .btns{display:grid; gap:7px;}
     .btns.two{grid-template-columns:1fr 1fr;}
     .btns.three{grid-template-columns:1fr 1fr 1fr;}
@@ -45,7 +42,6 @@
       border-radius:10px; background:#fff; color:var(--gray); cursor:pointer; transition:.12s;}
     .opt.on{background:var(--blue); color:#fff; border-color:var(--blue); box-shadow:0 2px 6px rgba(14,165,233,.4);}
 
-    /* 現場プルダウン */
     .site-block{padding:10px 0; border-bottom:1px solid var(--line);}
     .site-block:last-child{border-bottom:none;}
     .site-row{display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin-top:8px;}
@@ -57,18 +53,15 @@
       border-radius:10px; background:#fff; color:var(--ink);}
     .other-input:focus{outline:none; border-color:var(--blue);}
 
-    /* 残業時間 */
     .ot-times{padding:8px 0 2px;}
     .row2{display:flex; align-items:center; gap:8px; justify-content:center;}
     .row2 .tilde{font-size:16px; color:var(--gray);}
     .time-sel select{padding:9px 4px; font-size:15px; min-width:72px;}
 
-    /* 距離（電卓入力） */
     .dist-display{width:100%; padding:11px 12px; font-size:19px; font-weight:700; text-align:right;
       border:2px solid var(--line); border-radius:10px; background:#fff; cursor:pointer; color:var(--ink);}
     .dist-display .unit{font-size:13px; color:var(--gray); margin-left:5px; font-weight:400;}
 
-    /* 同乗者 */
     .pass-block{padding:9px 0;}
     .pass-head{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
     .pass-head .lbl{flex:0 0 3.4em; font-size:14px; font-weight:700;
@@ -89,7 +82,6 @@
       border:none; border-radius:13px; cursor:pointer; box-shadow:0 4px 12px rgba(2,132,199,.4);}
     .submit:disabled{opacity:.5;}
 
-    /* 電卓モーダル */
     .modal{position:fixed; inset:0; background:rgba(15,23,42,.55); display:none;
       align-items:flex-end; justify-content:center; z-index:50;}
     .modal.show{display:flex;}
@@ -121,7 +113,6 @@
 
   <div class="wrap">
 
-    <!-- お名前・日付 -->
     <div class="card">
       <div class="item">
         <div class="lbl">お名前</div>
@@ -136,9 +127,7 @@
       </div>
     </div>
 
-    <!-- 出勤・現場・残業・宿泊・車両 -->
     <div class="card">
-      <!-- 出勤 -->
       <div class="item">
         <div class="lbl">出勤</div>
         <div class="ctrl">
@@ -151,7 +140,6 @@
         </div>
       </div>
 
-      <!-- 現場（単一/複数）：終日のときだけ表示 -->
       <div class="item hide" id="siteModeRow">
         <div class="lbl">現場</div>
         <div class="ctrl">
@@ -162,13 +150,11 @@
         </div>
       </div>
 
-      <!-- 現場プルダウン -->
       <div class="site-block hide" id="siteArea">
         <div id="siteList"></div>
         <button class="add-btn hide" id="siteAddBtn" type="button" onclick="addSiteSelect()" style="margin-top:8px;">＋ 現場を追加</button>
       </div>
 
-      <!-- 残業 -->
       <div class="item">
         <div class="lbl">残業</div>
         <div class="ctrl">
@@ -188,7 +174,6 @@
         </div>
       </div>
 
-      <!-- 宿泊 -->
       <div class="item">
         <div class="lbl">宿泊</div>
         <div class="ctrl">
@@ -208,7 +193,6 @@
         </div>
       </div>
 
-      <!-- 車両 -->
       <div class="item">
         <div class="lbl">車両</div>
         <div class="ctrl">
@@ -220,7 +204,6 @@
       </div>
     </div>
 
-    <!-- 通勤距離・運転者・同乗者 -->
     <div class="card">
       <div class="item">
         <div class="lbl wide">自宅〜現場</div>
@@ -239,7 +222,6 @@
         </div>
       </div>
 
-      <!-- 運転者 -->
       <div class="item">
         <div class="lbl">運転者</div>
         <div class="ctrl">
@@ -255,7 +237,6 @@
         </div>
       </div>
 
-      <!-- 同乗者 -->
       <div class="pass-block">
         <div class="pass-head">
           <div class="lbl">同乗者</div>
@@ -265,14 +246,13 @@
       </div>
     </div>
 
-    <div class="admin-link"><a href="#" id="adminLink">管理画面はこちら</a></div>
+    <div class="admin-link"><a href="/admin.html">管理画面はこちら</a></div>
   </div>
 
   <div class="footer">
     <button class="submit" id="submitBtn" onclick="submit()">この内容で登録する</button>
   </div>
 
-  <!-- 電卓モーダル -->
   <div class="modal" id="calcModal">
     <div class="calc">
       <div class="calc-head">距離を入力（km）</div>
@@ -303,9 +283,9 @@
     let SITES = [];
     let calcBuf = '0';
     let calcTarget = 'distGenba';
-    let editingId = null;   // 既存データを修正中ならその記録ID
+    let editingId = null;
 
-    window.onload = function(){
+    window.onload = async function(){
       var t = new Date();
       document.getElementById('date').value =
         t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
@@ -315,24 +295,28 @@
         for(var h=0;h<24;h++){ s.add(new Option(String(h).padStart(2,'0')+'時', String(h).padStart(2,'0'))); }
       });
 
-      google.script.run.withSuccessHandler(fillUsers).getActiveUsers();
-      google.script.run.withSuccessHandler(fillSites).getActiveSites();
-      google.script.run.withSuccessHandler(function(url){
-        document.getElementById('adminLink').href = url + '?page=admin';
-      }).getAppUrl();
+      try {
+        const [users, sites] = await Promise.all([
+          fetch('/api/users').then(function(r){ return r.json(); }),
+          fetch('/api/sites').then(function(r){ return r.json(); }),
+        ]);
+        fillUsers(users);
+        fillSites(sites);
+      } catch(e) {
+        toast('データ読み込みエラー: ' + e.message, 3000);
+      }
 
       addPassenger();
     };
 
     function fillUsers(list){
-      USERS=list;
+      USERS = list;
       var sel=document.getElementById('user'), drv=document.getElementById('driver');
       list.forEach(function(u){ sel.add(new Option(u.name,u.name)); drv.add(new Option(u.name,u.name)); });
       refreshPassengerOptions();
     }
-    function fillSites(list){ SITES=list; }
+    function fillSites(list){ SITES = list; }
 
-    /* ===== お名前・既存データ読込 ===== */
     function onUserChange(){
       var name=document.getElementById('user').value;
       var u=USERS.find(function(x){return x.name===name;});
@@ -341,12 +325,17 @@
       else box.style.display='none';
       loadExisting();
     }
+
     function loadExisting(){
       var name=document.getElementById('user').value;
       var date=document.getElementById('date').value;
       if(!name || !date){ return; }
-      google.script.run.withSuccessHandler(populateForm).getRecordForEdit(name, date);
+      fetch('/api/record?name='+encodeURIComponent(name)+'&date='+encodeURIComponent(date))
+        .then(function(r){ return r.json(); })
+        .then(populateForm)
+        .catch(function(e){ toast('読み込みエラー: '+e.message, 3000); });
     }
+
     function selectOpt(group, val){
       if(val==null || val==='') return null;
       var b=document.querySelector('.opt[data-g="'+group+'"][data-v="'+val+'"]');
@@ -361,7 +350,7 @@
     function updateSubmitLabel(){
       document.getElementById('submitBtn').textContent = editingId ? 'この内容で上書き保存する' : 'この内容で登録する';
     }
-    // 既存データをフォームへ展開（recがnullなら空欄）
+
     function populateForm(rec){
       clearInputs();
       if(!rec){ editingId=null; updateSubmitLabel(); return; }
@@ -379,7 +368,7 @@
         var ss=document.querySelectorAll('#siteList select');
         sites.forEach(function(s,i){ if(ss[i]) setRowSite(ss[i], s); });
       } else if(rec.attendance==='午前' || rec.attendance==='午後'){
-        var ss2=document.querySelectorAll('#siteList select');  // onAtt が1つ用意済み
+        var ss2=document.querySelectorAll('#siteList select');
         if(ss2[0]) setRowSite(ss2[0], sites[0] || '');
       }
 
@@ -407,7 +396,6 @@
       updateSubmitLabel();
     }
 
-    /* ===== ボタン選択 ===== */
     function pick(btn){
       var g=btn.getAttribute('data-g');
       document.querySelectorAll('.opt[data-g="'+g+'"]').forEach(function(b){b.classList.remove('on');});
@@ -415,7 +403,6 @@
     }
     function getPick(g){ var b=document.querySelector('.opt[data-g="'+g+'"].on'); return b?b.getAttribute('data-v'):''; }
 
-    /* ===== 現場 ===== */
     function addSiteRow(label, removable){
       var wrap=document.getElementById('siteList');
       var row=document.createElement('div'); row.className='site-row';
@@ -459,7 +446,6 @@
         area.classList.add('hide');
       }
     }
-    // 出勤区分に応じて現場入力を出し分け
     function onAtt(){
       var att=getPick('att');
       document.querySelectorAll('.opt[data-g="sitemode"].on').forEach(function(b){ b.classList.remove('on'); });
@@ -469,12 +455,11 @@
       document.getElementById('siteModeRow').classList.add('hide');
 
       if(att==='終日'){
-        document.getElementById('siteModeRow').classList.remove('hide');   // 単一/複数を選ぶ
+        document.getElementById('siteModeRow').classList.remove('hide');
       } else if(att==='午前' || att==='午後'){
-        document.getElementById('siteArea').classList.remove('hide');       // 現場プルダウン1つを直接
+        document.getElementById('siteArea').classList.remove('hide');
         addSiteRow('', false);
       }
-      // 休み・未選択：現場入力なし
     }
     function getSites(){
       var arr=[];
@@ -491,7 +476,6 @@
       });
       return arr;
     }
-    // 既存値をプルダウンに設定（登録済みになければ「その他」＋手入力に流し込む）
     function setRowSite(sel, value){
       if(!value) return;
       var exists=Array.prototype.some.call(sel.options, function(o){ return o.value===value; });
@@ -502,7 +486,6 @@
       if(t){ t.classList.remove('hide'); t.value=value; }
     }
 
-    /* ===== 残業・運転者・宿泊 ===== */
     function toggleOT(){
       var on=getPick('ot')==='あり';
       var a=document.getElementById('otArea');
@@ -522,7 +505,6 @@
       if(!on) document.querySelectorAll('.opt[data-g="meal"].on').forEach(function(b){b.classList.remove('on');});
     }
 
-    /* ===== 同乗者 ===== */
     function addPassenger(){
       var wrap=document.getElementById('passengers');
       var row=document.createElement('div'); row.className='passenger-row';
@@ -543,7 +525,6 @@
       var arr=[]; document.querySelectorAll('#passengers select').forEach(function(sel){ if(sel.value) arr.push(sel.value); }); return arr;
     }
 
-    /* ===== 電卓 ===== */
     function openCalc(target){ calcTarget=target||'distGenba'; calcBuf=document.getElementById(calcTarget).textContent||'0'; if(calcBuf==='―')calcBuf='0'; render(); document.getElementById('calcModal').classList.add('show'); }
     function closeCalc(){ document.getElementById(calcTarget).textContent=trim(calcBuf); document.getElementById('calcModal').classList.remove('show'); }
     function ck(k){
@@ -557,7 +538,6 @@
     function trim(v){ if(v.endsWith('.'))v=v.slice(0,-1); return v===''?'0':v; }
     function toast(msg,ms){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); if(ms!==0) setTimeout(function(){t.classList.remove('show');},ms||1800); }
 
-    /* ===== 保存 ===== */
     function submit(){
       var name=document.getElementById('user').value;
       var date=document.getElementById('date').value;
@@ -579,7 +559,7 @@
         siteLabel=sites.join('、');
         siteModeLabel=(sitemode==='単一')?'単一現場':'複数現場';
         workDays=1;
-      } else {   // 午前 / 午後（単一現場前提）
+      } else {
         var sites2=getSites();
         if(sites2.length===0){alert('現場を選んでください');return;}
         siteLabel=sites2.join('、');
@@ -611,17 +591,23 @@
       var btn=document.getElementById('submitBtn');
       btn.disabled=true; btn.textContent='保存中...'; toast('保存中...',0);
       var wasEditing=!!editingId;
-      var runner=google.script.run
-        .withSuccessHandler(function(res){
-          toast(wasEditing?'更新しました！':'登録しました！');
-          if(res && res.id){ editingId=res.id; }
-          btn.disabled=false; updateSubmitLabel();
-        })
-        .withFailureHandler(function(e){ toast('エラー: '+e.message,3000); btn.disabled=false; updateSubmitLabel(); });
-      if(editingId){ runner.updateRecord(editingId, data); } else { runner.submitRecord(data); }
+      var url = editingId ? '/api/record/'+editingId : '/api/record';
+      var method = editingId ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        toast(wasEditing?'更新しました！':'登録しました！');
+        if(res && res.id){ editingId=res.id; }
+        btn.disabled=false; updateSubmitLabel();
+      })
+      .catch(function(e){ toast('エラー: '+e.message,3000); btn.disabled=false; updateSubmitLabel(); });
     }
 
-    // 入力欄だけ初期化（お名前・日付は残す）
     function clearInputs(){
       document.querySelectorAll('.opt.on').forEach(function(b){b.classList.remove('on');});
       var a=document.getElementById('otArea'); a.classList.add('hide'); a.style.display='none';
