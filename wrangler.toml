@@ -5,4 +5,4 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "keiri-db"
-database_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+database_id = "f1936332-44d4-42e8-a779-b6895f4cfe8d"
