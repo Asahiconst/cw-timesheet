@@ -206,13 +206,6 @@
       touch-action:manipulation; min-height:40px;
     }
     .sub-btn:active{opacity:.75;}
-    .date-copy-panel{display:flex; gap:6px; margin-top:6px; align-items:center;}
-    .date-copy-panel input[type=date]{
-      flex:1; padding:9px; font-size:15px;
-      border:2px solid var(--line); border-radius:10px;
-      background:#fff; color:var(--ink);
-      appearance:none; -webkit-appearance:none;
-    }
 
     .admin-link{text-align:center; margin:10px 0 4px;}
     .admin-link a{font-size:9px; color:#cbd5e1; text-decoration:none;}
@@ -240,12 +233,8 @@
           <input type="date" id="date" onchange="loadExisting()">
           <div class="date-btns">
             <button class="sub-btn" type="button" onclick="copyPrevious()">前回コピー</button>
-            <button class="sub-btn" type="button" onclick="toggleDateCopyPanel()">日付指定コピー</button>
+            <button class="sub-btn" type="button" onclick="openDateCopyModal()">日付指定<br>コピー</button>
             <button class="sub-btn" type="button" onclick="clearForm()">クリア</button>
-          </div>
-          <div class="date-copy-panel hide" id="dateCopyPanel">
-            <input type="date" id="copyFromDate">
-            <button class="sub-btn" type="button" style="flex:0 0 auto; padding:8px 12px;" onclick="copyFromSpecificDate()">コピー実行</button>
           </div>
         </div>
       </div>
@@ -408,6 +397,19 @@
         <button class="key fn" onclick="ck('back')">⌫</button>
         <button class="key fn" onclick="ck('clear')">クリア</button>
         <button class="key ok" onclick="closeCalc()">決定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日付指定コピーモーダル -->
+  <div class="modal" id="dateCopyModal" onclick="onDateCopyModalBg(event)">
+    <div class="calc">
+      <div class="drag-handle"></div>
+      <div class="calc-head">コピー元の日付を選択</div>
+      <input type="date" id="copyFromDate" style="width:100%; padding:12px; font-size:17px; border:2px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); appearance:none; -webkit-appearance:none; margin-bottom:10px;">
+      <div style="display:flex; gap:8px;">
+        <button class="sub-btn" type="button" onclick="closeDateCopyModal()">キャンセル</button>
+        <button class="sub-btn" type="button" onclick="copyFromSpecificDate()">コピー実行</button>
       </div>
     </div>
   </div>
@@ -765,8 +767,16 @@
         .catch(function(e){ toast('エラー: '+e.message,3000); btn.disabled=false; updateSubmitLabel(); });
     }
 
-    function toggleDateCopyPanel(){
-      document.getElementById('dateCopyPanel').classList.toggle('hide');
+    function openDateCopyModal(){
+      document.getElementById('dateCopyModal').classList.add('show');
+      document.body.style.overflow='hidden';
+    }
+    function closeDateCopyModal(){
+      document.getElementById('dateCopyModal').classList.remove('show');
+      document.body.style.overflow='';
+    }
+    function onDateCopyModalBg(e){
+      if(e.target===document.getElementById('dateCopyModal')) closeDateCopyModal();
     }
 
     function copyFromSpecificDate(){
@@ -781,7 +791,7 @@
           populateForm(rec);
           editingId=null;
           updateSubmitLabel();
-          document.getElementById('dateCopyPanel').classList.add('hide');
+          closeDateCopyModal();
           toast(fromDate+'の入力をコピーしました');
         })
         .catch(function(e){toast('エラー: '+e.message,3000);});
