@@ -198,6 +198,16 @@
       pointer-events:none; opacity:0; transition:opacity .2s;
     }
     .toast.show{opacity:1;}
+    .date-btns{display:flex; gap:6px; margin-top:6px;}
+    .sub-btn{
+      flex:1; padding:9px 4px; font-size:13px; font-weight:700;
+      border:2px solid var(--blue); border-radius:10px;
+      background:var(--blue-bg); color:var(--blue-d); cursor:pointer;
+      touch-action:manipulation; min-height:40px;
+    }
+    .sub-btn:active{opacity:.75;}
+    .sub-btn.gray{background:#f1f5f9; border-color:var(--line); color:var(--gray);}
+
     .admin-link{text-align:center; margin:10px 0 4px;}
     .admin-link a{font-size:9px; color:#cbd5e1; text-decoration:none;}
   </style>
@@ -220,7 +230,13 @@
       </div>
       <div class="item">
         <div class="lbl">日付</div>
-        <div class="ctrl"><input type="date" id="date" onchange="loadExisting()"></div>
+        <div class="ctrl">
+          <input type="date" id="date" onchange="loadExisting()">
+          <div class="date-btns">
+            <button class="sub-btn" type="button" onclick="copyPrevious()">前回入力コピー</button>
+            <button class="sub-btn gray" type="button" onclick="clearForm()">クリア</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -736,6 +752,29 @@
           btn.disabled=false; updateSubmitLabel();
         })
         .catch(function(e){ toast('エラー: '+e.message,3000); btn.disabled=false; updateSubmitLabel(); });
+    }
+
+    function copyPrevious(){
+      var name=document.getElementById('user').value;
+      var date=document.getElementById('date').value;
+      if(!name){alert('お名前を選択してください');return;}
+      if(!date){alert('日付を選択してください');return;}
+      fetch('/api/record/latest?name='+encodeURIComponent(name)+'&before='+encodeURIComponent(date))
+        .then(function(r){return r.json();})
+        .then(function(rec){
+          if(!rec){toast('前回の入力データが見つかりませんでした',2500);return;}
+          populateForm(rec);
+          editingId=null;
+          updateSubmitLabel();
+          toast('前回の入力をコピーしました');
+        })
+        .catch(function(e){toast('エラー: '+e.message,3000);});
+    }
+
+    function clearForm(){
+      clearInputs();
+      editingId=null;
+      updateSubmitLabel();
     }
 
     function clearInputs(){

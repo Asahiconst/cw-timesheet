@@ -88,6 +88,32 @@ export async function onRequest({ request, env }) {
     return json({ ok: true, id });
   }
 
+  if (method === 'GET' && path === '/record/latest') {
+    const name = url.searchParams.get('name');
+    const before = url.searchParams.get('before');
+    if (!name || !before) return json(null);
+    const row = await env.DB.prepare(
+      "SELECT * FROM records WHERE user_name = ? AND date < ? ORDER BY date DESC, created_at DESC LIMIT 1"
+    ).bind(name, before).first();
+    if (!row) return json(null);
+    return json({
+      id: row.id,
+      attendance: row.attendance,
+      siteMode: row.site_mode,
+      site: row.site,
+      overtime: row.overtime,
+      otStart: row.overtime_start,
+      otEnd: row.overtime_end,
+      stay: row.stay,
+      meal: row.meal,
+      carType: row.car_type,
+      commuteGenba: row.commute_genba,
+      commuteShugo: row.commute_shugo,
+      driver: row.driver,
+      passengers: row.passengers,
+    });
+  }
+
   if (method === 'PUT' && path.startsWith('/record/')) {
     const id = path.slice(8);
     const d = await request.json();
