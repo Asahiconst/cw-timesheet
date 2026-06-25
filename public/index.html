@@ -200,13 +200,19 @@
     .toast.show{opacity:1;}
     .date-btns{display:flex; gap:6px; margin-top:6px;}
     .sub-btn{
-      flex:1; padding:9px 4px; font-size:13px; font-weight:700;
-      border:2px solid var(--blue); border-radius:10px;
-      background:var(--blue-bg); color:var(--blue-d); cursor:pointer;
+      flex:1; padding:8px 2px; font-size:12px; font-weight:700;
+      border:2px solid var(--line); border-radius:10px;
+      background:#f8fafc; color:var(--ink); cursor:pointer;
       touch-action:manipulation; min-height:40px;
     }
     .sub-btn:active{opacity:.75;}
-    .sub-btn.gray{background:#f1f5f9; border-color:var(--line); color:var(--gray);}
+    .date-copy-panel{display:flex; gap:6px; margin-top:6px; align-items:center;}
+    .date-copy-panel input[type=date]{
+      flex:1; padding:9px; font-size:15px;
+      border:2px solid var(--line); border-radius:10px;
+      background:#fff; color:var(--ink);
+      appearance:none; -webkit-appearance:none;
+    }
 
     .admin-link{text-align:center; margin:10px 0 4px;}
     .admin-link a{font-size:9px; color:#cbd5e1; text-decoration:none;}
@@ -233,8 +239,13 @@
         <div class="ctrl">
           <input type="date" id="date" onchange="loadExisting()">
           <div class="date-btns">
-            <button class="sub-btn" type="button" onclick="copyPrevious()">前回入力コピー</button>
-            <button class="sub-btn gray" type="button" onclick="clearForm()">クリア</button>
+            <button class="sub-btn" type="button" onclick="copyPrevious()">前回コピー</button>
+            <button class="sub-btn" type="button" onclick="toggleDateCopyPanel()">日付指定コピー</button>
+            <button class="sub-btn" type="button" onclick="clearForm()">クリア</button>
+          </div>
+          <div class="date-copy-panel hide" id="dateCopyPanel">
+            <input type="date" id="copyFromDate">
+            <button class="sub-btn" type="button" style="flex:0 0 auto; padding:8px 12px;" onclick="copyFromSpecificDate()">コピー実行</button>
           </div>
         </div>
       </div>
@@ -752,6 +763,28 @@
           btn.disabled=false; updateSubmitLabel();
         })
         .catch(function(e){ toast('エラー: '+e.message,3000); btn.disabled=false; updateSubmitLabel(); });
+    }
+
+    function toggleDateCopyPanel(){
+      document.getElementById('dateCopyPanel').classList.toggle('hide');
+    }
+
+    function copyFromSpecificDate(){
+      var name=document.getElementById('user').value;
+      var fromDate=document.getElementById('copyFromDate').value;
+      if(!name){alert('お名前を選択してください');return;}
+      if(!fromDate){alert('コピー元の日付を選択してください');return;}
+      fetch('/api/record?name='+encodeURIComponent(name)+'&date='+encodeURIComponent(fromDate))
+        .then(function(r){return r.json();})
+        .then(function(rec){
+          if(!rec){toast(fromDate+'のデータが見つかりませんでした',2500);return;}
+          populateForm(rec);
+          editingId=null;
+          updateSubmitLabel();
+          document.getElementById('dateCopyPanel').classList.add('hide');
+          toast(fromDate+'の入力をコピーしました');
+        })
+        .catch(function(e){toast('エラー: '+e.message,3000);});
     }
 
     function copyPrevious(){
