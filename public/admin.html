@@ -33,6 +33,7 @@
     .btn.sm{padding:8px 13px; font-size:13px;}
     .btn.gray{background:#e2e8f0; color:var(--ink);}
     .btn.green{background:linear-gradient(135deg,#22c55e,#16a34a);}
+    .btn.red{background:linear-gradient(135deg,#ef4444,#dc2626);}
 
     .tabs{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
     .tab{padding:10px 16px; font-size:14px; font-weight:700; background:#fff; color:var(--gray);
@@ -69,7 +70,7 @@
       padding:14px 20px; border-radius:10px; font-size:14px; display:none; z-index:99;}
     .toast.show{display:block;}
     .muted{color:var(--gray); font-size:13px; margin:6px 0;}
-    .export-row{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+    .export-row{display:flex; gap:8px; margin-top:10px; margin-bottom:16px; flex-wrap:wrap;}
 
     /* ===== スマホ対応（PCレイアウトに影響しない） ===== */
     @media (max-width: 768px){
@@ -125,6 +126,7 @@
   <div id="adminView" style="display:none;">
     <header>
       <h1>旭建設CW出勤簿アプリ ― 管理画面</h1>
+      <a href="/" class="btn sm gray no-print">入力画面へ</a>
       <button class="btn sm gray no-print" onclick="logout()">ログアウト</button>
     </header>
     <div class="wrap">
@@ -274,7 +276,10 @@
             '<td><input class="leave-input" type="number" step="0.5" value="'+u.leave+'" id="lv_'+u.id+'"> '+
               '<button class="btn sm" onclick="saveLeave(\''+u.id+'\')">保存</button></td>'+
             '<td>'+(u.active?'<span class="tag on">有効</span>':'<span class="tag off">無効</span>')+'</td>'+
-            '<td><button class="btn sm gray" onclick="toggleUser(\''+u.id+'\','+(!u.active)+')">'+(u.active?'無効化':'有効化')+'</button></td>';
+            '<td>'+
+              '<button class="btn sm gray" onclick="toggleUser(\''+u.id+'\','+(!u.active)+')">'+(u.active?'無効化':'有効化')+'</button> '+
+              '<button class="btn sm red" onclick="deleteUser(\''+u.id+'\',\''+u.name+'\')">削除</button>'+
+            '</td>';
           tb.appendChild(tr);
           if(u.active) fName.add(new Option(u.name, u.name));
         });
@@ -301,6 +306,13 @@
       .catch(function(e){ toast(e.message); });
     }
 
+    function deleteUser(id, name){
+      if(!confirm('「'+name+'」を削除しますか？\n※この操作は元に戻せません。')) return;
+      api('/admin/users/'+id, { method:'DELETE' })
+        .then(function(){ toast('削除しました'); loadUsers(); })
+        .catch(function(e){ toast(e.message); });
+    }
+
     function toggleUser(id, active){
       api('/admin/users/'+id+'/active', {
         method:'PUT', headers:{'Content-Type':'application/json'},
@@ -317,7 +329,10 @@
           tr.innerHTML =
             '<td>'+s.name+'</td>'+
             '<td>'+(s.active?'<span class="tag on">有効</span>':'<span class="tag off">無効</span>')+'</td>'+
-            '<td><button class="btn sm gray" onclick="toggleSite(\''+s.id+'\','+(!s.active)+')">'+(s.active?'無効化':'有効化')+'</button></td>';
+            '<td>'+
+              '<button class="btn sm gray" onclick="toggleSite(\''+s.id+'\','+(!s.active)+')">'+(s.active?'無効化':'有効化')+'</button> '+
+              '<button class="btn sm red" onclick="deleteSite(\''+s.id+'\',\''+s.name+'\')">削除</button>'+
+            '</td>';
           tb.appendChild(tr);
         });
       }).catch(function(e){ toast(e.message); });
@@ -331,6 +346,13 @@
         body:JSON.stringify({name:n})
       }).then(function(){ toast('登録しました'); document.getElementById('sName').value=''; loadSites(); })
       .catch(function(e){ toast(e.message); });
+    }
+
+    function deleteSite(id, name){
+      if(!confirm('「'+name+'」を削除しますか？\n※この操作は元に戻せません。')) return;
+      api('/admin/sites/'+id, { method:'DELETE' })
+        .then(function(){ toast('削除しました'); loadSites(); })
+        .catch(function(e){ toast(e.message); });
     }
 
     function toggleSite(id, active){

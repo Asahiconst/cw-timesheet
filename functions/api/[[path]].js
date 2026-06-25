@@ -160,6 +160,13 @@ export async function onRequest({ request, env }) {
     return json({ ok: true });
   }
 
+  const userDeleteMatch = path.match(/^\/admin\/users\/([^/]+)$/);
+  if (method === 'DELETE' && userDeleteMatch) {
+    await env.DB.prepare('DELETE FROM users WHERE id = ?')
+      .bind(userDeleteMatch[1]).run();
+    return json({ ok: true });
+  }
+
   if (method === 'GET' && path === '/admin/sites') {
     const { results } = await env.DB.prepare(
       'SELECT id, name, active FROM sites ORDER BY rowid'
@@ -180,6 +187,13 @@ export async function onRequest({ request, env }) {
     const { active } = await request.json();
     await env.DB.prepare('UPDATE sites SET active = ? WHERE id = ?')
       .bind(active ? 1 : 0, siteActiveMatch[1]).run();
+    return json({ ok: true });
+  }
+
+  const siteDeleteMatch = path.match(/^\/admin\/sites\/([^/]+)$/);
+  if (method === 'DELETE' && siteDeleteMatch) {
+    await env.DB.prepare('DELETE FROM sites WHERE id = ?')
+      .bind(siteDeleteMatch[1]).run();
     return json({ ok: true });
   }
 
