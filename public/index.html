@@ -401,18 +401,7 @@
     </div>
   </div>
 
-  <!-- 日付指定コピーモーダル -->
-  <div class="modal" id="dateCopyModal" onclick="onDateCopyModalBg(event)">
-    <div class="calc">
-      <div class="drag-handle"></div>
-      <div class="calc-head">コピー元の日付を選択</div>
-      <input type="date" id="copyFromDate" style="width:100%; padding:12px; font-size:17px; border:2px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); appearance:none; -webkit-appearance:none; margin-bottom:10px;">
-      <div style="display:flex; gap:8px;">
-        <button class="sub-btn" type="button" onclick="closeDateCopyModal()">キャンセル</button>
-        <button class="sub-btn" type="button" onclick="copyFromSpecificDate()">コピー実行</button>
-      </div>
-    </div>
-  </div>
+  <input type="date" id="copyFromDate" style="display:none" onchange="copyFromSpecificDate()">
 
   <div class="toast" id="toast"></div>
 
@@ -768,22 +757,14 @@
     }
 
     function openDateCopyModal(){
-      document.getElementById('dateCopyModal').classList.add('show');
-      document.body.style.overflow='hidden';
-    }
-    function closeDateCopyModal(){
-      document.getElementById('dateCopyModal').classList.remove('show');
-      document.body.style.overflow='';
-    }
-    function onDateCopyModalBg(e){
-      if(e.target===document.getElementById('dateCopyModal')) closeDateCopyModal();
+      document.getElementById('copyFromDate').click();
     }
 
     function copyFromSpecificDate(){
       var name=document.getElementById('user').value;
       var fromDate=document.getElementById('copyFromDate').value;
       if(!name){alert('お名前を選択してください');return;}
-      if(!fromDate){alert('コピー元の日付を選択してください');return;}
+      if(!fromDate) return;
       fetch('/api/record?name='+encodeURIComponent(name)+'&date='+encodeURIComponent(fromDate))
         .then(function(r){return r.json();})
         .then(function(rec){
@@ -791,7 +772,6 @@
           populateForm(rec);
           editingId=null;
           updateSubmitLabel();
-          closeDateCopyModal();
           toast(fromDate+'の入力をコピーしました');
         })
         .catch(function(e){toast('エラー: '+e.message,3000);});
