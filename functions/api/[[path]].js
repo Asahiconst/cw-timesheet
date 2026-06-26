@@ -98,6 +98,7 @@ export async function onRequest({ request, env }) {
     if (!row) return json(null);
     return json({
       id: row.id,
+      date: row.date,
       attendance: row.attendance,
       siteMode: row.site_mode,
       site: row.site,
