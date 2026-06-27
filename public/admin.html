@@ -134,7 +134,6 @@
         <button class="tab on" onclick="showTab('records',this)">出勤記録の閲覧</button>
         <button class="tab" onclick="showTab('users',this)">ユーザー管理</button>
         <button class="tab" onclick="showTab('sites',this)">現場管理</button>
-        <button class="tab" onclick="showTab('timesheet',this)">出勤簿出力</button>
       </div>
 
       <div class="panel on" id="panel-records">
@@ -210,19 +209,6 @@
         </div>
       </div>
 
-      <div class="panel" id="panel-timesheet">
-        <div class="card">
-          <h3>出勤簿 Excel 出力（様式に合わせた形式）</h3>
-          <p class="muted">登録されている全ユーザー分のシートを自動生成します。ユーザーが増えればシートも自動で増えます。</p>
-          <div class="form-row">
-            <div class="field"><label>年</label><select id="tsYear"></select></div>
-            <div class="field"><label>月</label><select id="tsMonth"></select></div>
-            <button class="btn sm green" onclick="exportTimesheet()">Excel 出力（出勤簿様式）</button>
-          </div>
-          <p class="muted" id="tsStatus"></p>
-        </div>
-      </div>
-
     </div>
   </div>
 
@@ -279,25 +265,7 @@
       document.getElementById('panel-'+name).classList.add('on');
     }
 
-    function loadAll(){ loadUsers(); loadSites(); loadRecords(); initTsSelectors(); }
-
-    function initTsSelectors(){
-      var now = new Date();
-      var curYear = now.getFullYear();
-      var curMonth = now.getMonth() + 1;
-      var ySel = document.getElementById('tsYear');
-      var mSel = document.getElementById('tsMonth');
-      if(ySel.options.length === 0){
-        for(var y = curYear - 1; y <= curYear + 1; y++){
-          ySel.add(new Option(y + '年', y));
-        }
-        ySel.value = curYear;
-        for(var m = 1; m <= 12; m++){
-          mSel.add(new Option(m + '月', m));
-        }
-        mSel.value = curMonth;
-      }
-    }
+    function loadAll(){ loadUsers(); loadSites(); loadRecords(); }
 
     function exportTimesheetFromFilter(){
       var from = document.getElementById('fFrom').value;
@@ -305,14 +273,10 @@
       exportTimesheet(d.getFullYear(), d.getMonth()+1);
     }
 
-    async function exportTimesheet(yr, mo){
-      var year  = yr  || parseInt(document.getElementById('tsYear').value);
-      var month = mo  || parseInt(document.getElementById('tsMonth').value);
-      var status = document.getElementById('tsStatus');
-      status.textContent = 'データ取得中...';
+    async function exportTimesheet(year, month){
       try {
         var users = await api('/admin/users').then(function(list){ return list.filter(function(u){ return u.active; }); });
-        if(users.length === 0){ status.textContent = '有効なユーザーがいません'; return; }
+        if(users.length === 0){ toast('有効なユーザーがいません'); return; }
         var daysInMonth = new Date(year, month, 0).getDate();
         var fromDate = year + '-' + String(month).padStart(2,'0') + '-01';
         var toDate   = year + '-' + String(month).padStart(2,'0') + '-' + String(daysInMonth).padStart(2,'0');
@@ -328,8 +292,8 @@
         });
         var fileName = '出勤簿_令和' + reiwa + '年' + month + '月分.xlsx';
         XLSX.writeFile(wb, fileName, { cellStyles: true });
-        status.textContent = users.length + '名分のシートを出力しました';
-      } catch(e){ status.textContent = 'エラー: ' + e.message; toast('エラー: ' + e.message); }
+        toast(users.length + '名分の出勤簿を出力しました');
+      } catch(e){ toast('エラー: ' + e.message); }
     }
 
     function buildTimesheetSheet(userName, records, year, month, reiwa){
