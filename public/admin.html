@@ -214,7 +214,7 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="/xlsx.full.min.js"></script>
+  <script src="/exceljs.min.js"></script>
   <script>
     var currentRecords = [];
 
@@ -285,20 +285,23 @@
         users.forEach(function(u){ recsByUser[u.name] = []; });
         allRecs.forEach(function(r){ if(recsByUser[r.name]) recsByUser[r.name].push(r); });
         var reiwa = year - 2018;
-        var wb = {SheetNames:[], Sheets:{}};
-        users.forEach(function(u){
-          var ws = buildTimesheetSheet(u.name, recsByUser[u.name] || [], year, month, reiwa);
-          var sheetName = u.name.slice(0, 31);
-          wb.SheetNames.push(sheetName);
-          wb.Sheets[sheetName] = ws;
-        });
-        var fileName = '出勤簿_令和' + reiwa + '年' + month + '月分.xlsx';
-        XLSX.writeFile(wb, fileName);
+        var wb = new ExcelJS.Workbook();
+        for(var i=0; i<users.length; i++){
+          var u = users[i];
+          await buildTimesheetSheet(wb, u.name, recsByUser[u.name] || [], year, month, reiwa);
+        }
+        var buf = await wb.xlsx.writeBuffer();
+        var blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = '出勤簿_令和'+reiwa+'年'+month+'月分.xlsx';
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
         toast(users.length + '名分の出勤簿を出力しました');
-      } catch(e){ toast('エラー: ' + e.message); }
+      } catch(e){ toast('エラー: ' + e.message); console.error(e); }
     }
 
-    function buildTimesheetSheet(userName, records, year, month, reiwa){
+    async function buildTimesheetSheet(wb, userName, records, year, month, reiwa){
       var daysInMonth = new Date(year, month, 0).getDate();
       var recMap = {};
       records.forEach(function(r){ recMap[r.date] = r; });
@@ -307,109 +310,104 @@
       records.forEach(function(r){ if(r.carType) carCounts[r.carType]=(carCounts[r.carType]||0)+1; });
       var carType = Object.keys(carCounts).sort(function(a,b){return carCounts[b]-carCounts[a];})[0]||'';
 
-      var totalWorkDays=0;
-      records.forEach(function(r){ totalWorkDays+=(r.workDays||0); });
-      var totalWorkHours=Math.round(totalWorkDays*75)/10;
+      var totalWorkDays = 0;
+      records.forEach(function(r){ totalWorkDays += (r.workDays||0); });
+      var totalWorkHours = Math.round(totalWorkDays * 75) / 10;
 
-      var ws={}, merges=[];
+      var ws = wb.addWorksheet(userName.slice(0, 31));
 
-      // セル書き込み
-      function W(r,c,v,s){
-        var ref=XLSX.utils.encode_cell({r:r,c:c});
-        ws[ref]={v:(v===null||v===undefined)?'':v, t:(typeof v==='number')?'n':'s', s:s||{}};
+      // ─── 列幅 ───
+      ws.columns = [
+        {width:1.5},  // A 余白
+        {width:7},    // B 月・日
+        {width:14},   // C 出欠時間
+        {width:8},    // D 労働時間
+        {width:24},   // E 現場名
+        {width:9},    // F 残業開始
+        {width:9},    // G 残業終了
+        {width:10},   // H 現場まで
+        {width:9},    // I 通勤状況
+        {width:9},    // J 交通費等
+        {width:6},    // K 他
+      ];
+
+      // ─── スタイル定数 ───
+      var bThin   = {style:'thin'};
+      var bMedium = {style:'medium'};
+      var bdAll   = {top:bThin,  bottom:bThin,  left:bThin,  right:bThin};
+      var bdMed   = {top:bMedium,bottom:bMedium,left:bMedium,right:bMedium};
+
+      function fill(argb){ return {type:'pattern',pattern:'solid',fgColor:{argb:argb}}; }
+      function font(sz,bold,argb){ var f={size:sz}; if(bold)f.bold=true; if(argb)f.color={argb:argb}; return f; }
+      function align(h,v,wrap){ var a={horizontal:h,vertical:v}; if(wrap)a.wrapText=true; return a; }
+
+      // ─── セルヘルパー ───
+      // ExcelJS行列は1始まり
+      function C(row, col){ return ws.getCell(row, col); }
+      function setCell(row, col, value, opts){
+        var cell = C(row, col);
+        cell.value = (value===null||value===undefined) ? null : value;
+        if(opts.fill)   cell.fill      = opts.fill;
+        if(opts.font)   cell.font      = opts.font;
+        if(opts.align)  cell.alignment = opts.align;
+        if(opts.border) cell.border    = opts.border;
       }
-      function M(r1,c1,r2,c2){ merges.push({s:{r:r1,c:c1},e:{r:r2,c:c2}}); }
+      function merge(r1,c1,r2,c2){ ws.mergeCells(r1,c1,r2,c2); }
 
-      // ─── 罫線（黒） ───
-      var T={style:'thin',  color:{rgb:'000000'}};
-      var M_={style:'medium',color:{rgb:'000000'}};
-      var bdT={top:T,bottom:T,left:T,right:T};           // 細線全周
-      var bdM={top:M_,bottom:M_,left:M_,right:M_};       // 太線全周
-      var bdTM={top:T,bottom:M_,left:T,right:T};          // 下だけ太線
+      // ━━━━ 行1: タイトル ━━━━
+      ws.getRow(1).height = 22;
+      setCell(1,2,'令和'+reiwa+'年'+month+'月分　出勤簿　　旭建設株式会社',
+        {fill:fill('FF1E3A5F'), font:font(13,true,'FFFFFFFF'), align:align('center','middle'), border:bdMed});
+      merge(1,2,1,11);
 
-      // ─── 塗りつぶし ───
-      function fl(rgb){return {patternType:'solid',fgColor:{rgb:rgb}};}
-      var F_TITLE = fl('1E3A5F'); // 紺
-      var F_HDR   = fl('2563EB'); // 青（ヘッダー行）
-      var F_SUB   = fl('DBEAFE'); // 薄青（サマリーラベル）
-      var F_SUM   = fl('EFF6FF'); // さらに薄青（サマリー値）
-      var F_GRAY  = fl('E5E7EB'); // グレー（フッター・車両種別）
-      var F_SUN   = fl('FEE2E2'); // 薄赤（日曜）
-      var F_SAT   = fl('DBEAFE'); // 薄青（土曜）
-      var F_NTICE = fl('FEFCE8'); // 薄黄（注意事項）
+      // ━━━━ 行2: 氏名 ━━━━
+      ws.getRow(2).height = 18;
+      setCell(2,2,'氏　名',{fill:fill('FFE5E7EB'),font:font(9,true),align:align('center','middle'),border:bdAll});
+      setCell(2,3,userName,{font:font(12,true),align:align('left','middle')});
+      merge(2,3,2,7);
+      setCell(2,8,'（作業員用）',{font:font(9),align:align('left','middle')});
+      merge(2,8,2,11);
 
-      // ─── 配置 ───
-      var CC={horizontal:'center',vertical:'center'};
-      var CL={horizontal:'left',  vertical:'center'};
-      var CR={horizontal:'right', vertical:'center'};
-      var CW={horizontal:'center',vertical:'center',wrapText:true};
+      // ━━━━ 行3: スペーサー ━━━━
+      ws.getRow(3).height = 5;
 
-      // ─── フォント ───
-      function f(sz,bold,white){
-        var o={sz:sz}; if(bold)o.bold=true; if(white)o.color={rgb:'FFFFFF'}; return o;
-      }
+      // ━━━━ 行4: サマリー見出し ━━━━
+      ws.getRow(4).height = 13;
+      var fSub = fill('FFDBEAFE');
+      var bMedL = {top:bMedium,left:bMedium,bottom:bThin,right:bThin};
+      var bMedR = {top:bMedium,left:bThin, bottom:bThin,right:bMedium};
+      var bMedM = {top:bMedium,left:bThin, bottom:bThin,right:bThin};
+      setCell(4,2,'労働日数（合計）',{fill:fSub,font:font(8,true),align:align('center','middle'),border:bMedL}); merge(4,2,4,4);
+      setCell(4,3,'',{fill:fSub,border:bMedM}); setCell(4,4,'',{fill:fSub,border:{top:bMedium,bottom:bThin,right:bThin}});
+      setCell(4,5,'残業時間（合計）',{fill:fSub,font:font(8,true),align:align('center','middle'),border:bMedM}); merge(4,5,4,7);
+      setCell(4,6,'',{fill:fSub,border:bMedM}); setCell(4,7,'',{fill:fSub,border:{top:bMedium,bottom:bThin,right:bThin}});
+      setCell(4,8,'そ　の　他',{fill:fSub,font:font(8,true),align:align('center','middle'),border:bMedM}); merge(4,8,4,10);
+      setCell(4,9,'',{fill:fSub,border:bMedM}); setCell(4,10,'',{fill:fSub,border:bMedM});
+      setCell(4,11,'',{fill:fSub,border:bMedR});
 
-      // ─── スタイル生成 ───
-      function s(font,fill,align,border){
-        var o={};
-        if(font)   o.font=font;
-        if(fill)   o.fill=fill;
-        if(align)  o.alignment=align;
-        if(border) o.border=border;
-        return o;
-      }
+      // ━━━━ 行5: サマリーサブラベル ━━━━
+      ws.getRow(5).height = 13;
+      var slDefs = [[2,'通常出勤'],[3,'休日出勤'],[4,'合　計'],[5,'普通時間'],[6,'深夜時間'],[7,'合　計'],[8,'有　給'],[9,'公　休'],[10,'振　替'],[11,'']];
+      slDefs.forEach(function(x){
+        setCell(5,x[0],x[1],{fill:fSub,font:font(8,true),align:align('center','middle'),border:bdAll});
+      });
 
-      // ━━━━ R0: タイトル ━━━━
-      W(0,1,'令和'+reiwa+'年'+month+'月分　出勤簿　　旭建設株式会社',
-        s(f(13,true,true),F_TITLE,CC,bdM));
-      M(0,1,0,10);
+      // ━━━━ 行6: サマリー値 ━━━━
+      ws.getRow(6).height = 16;
+      var fSum = fill('FFEFF6FF');
+      var bBotMed = {top:bThin,left:bThin,bottom:bMedium,right:bThin};
+      var bBotMedL = {top:bThin,left:bMedium,bottom:bMedium,right:bThin};
+      var bBotMedR = {top:bThin,left:bThin,bottom:bMedium,right:bMedium};
+      var svDefs = [[2,totalWorkDays,'left'],[3,0,''],[4,totalWorkDays,''],[5,0,''],[6,0,''],[7,0,''],[8,0,''],[9,0,''],[10,0,''],[11,'','right']];
+      svDefs.forEach(function(x, idx){
+        var brd = (idx===0) ? bBotMedL : (idx===svDefs.length-1) ? bBotMedR : bBotMed;
+        setCell(6,x[0],x[1],{fill:fSum,font:font(10,true),align:align('center','middle'),border:brd});
+      });
 
-      // ━━━━ R1: 氏名 ━━━━
-      W(1,1,'氏　名', s(f(9,true),F_GRAY,CC,bdT));
-      W(1,2,userName, s(f(12,true),null,CL));
-      M(1,2,1,6);
-      W(1,7,'（作業員用）', s(f(9),null,CL));
-      M(1,7,1,10);
+      // ━━━━ 行7: スペーサー ━━━━
+      ws.getRow(7).height = 5;
 
-      // ━━━━ R2: スペーサー ━━━━
-
-      // ━━━━ R3: サマリーラベル ━━━━
-      // 「労働日数」「残業時間」「その他」の3区画をB-K全体に均等配置
-      W(3,1,'労働日数（合計）', s(f(8,true),F_SUB,CC,{top:M_,left:M_,right:T,bottom:T}));
-      M(3,1,3,3);
-      W(3,2,'',s(null,F_SUB,null,{top:M_,bottom:T}));
-      W(3,3,'',s(null,F_SUB,null,{top:M_,right:T,bottom:T}));
-      W(3,4,'残業時間（合計）', s(f(8,true),F_SUB,CC,{top:M_,left:T,right:T,bottom:T}));
-      M(3,4,3,6);
-      W(3,5,'',s(null,F_SUB,null,{top:M_,bottom:T}));
-      W(3,6,'',s(null,F_SUB,null,{top:M_,right:T,bottom:T}));
-      W(3,7,'そ　の　他', s(f(8,true),F_SUB,CC,{top:M_,left:T,right:M_,bottom:T}));
-      M(3,7,3,10);
-      W(3,8,'',s(null,F_SUB,null,{top:M_,bottom:T}));
-      W(3,9,'',s(null,F_SUB,null,{top:M_,bottom:T}));
-      W(3,10,'',s(null,F_SUB,null,{top:M_,right:M_,bottom:T}));
-
-      // ━━━━ R4: サマリーサブラベル ━━━━
-      var sl=s(f(8,true),F_SUB,CC,bdT);
-      W(4,1,'通常出勤',sl); W(4,2,'休日出勤',sl); W(4,3,'合　計',sl);
-      W(4,4,'普通時間',sl); W(4,5,'深夜時間',sl); W(4,6,'合　計',sl);
-      W(4,7,'有　給', sl); W(4,8,'公　休', sl); W(4,9,'振　替', sl);
-      W(4,10,'', s(f(8),F_SUB,CC,{top:T,bottom:T,left:T,right:M_}));
-
-      // ━━━━ R5: サマリー値 ━━━━
-      var sv=s(f(10,true),F_SUM,CC,bdT);
-      var sv_l=s(f(10,true),F_SUM,CC,{top:T,bottom:M_,left:M_,right:T});
-      var sv_r=s(f(10,true),F_SUM,CC,{top:T,bottom:M_,left:T,right:M_});
-      W(5,1,totalWorkDays,sv_l);
-      W(5,2,0,sv); W(5,3,totalWorkDays,sv);
-      W(5,4,0,sv); W(5,5,0,sv); W(5,6,0,sv);
-      W(5,7,0,sv); W(5,8,0,sv); W(5,9,0,sv);
-      W(5,10,'',s(f(10),F_SUM,CC,{top:T,bottom:M_,left:T,right:M_}));
-
-      // ━━━━ R6: スペーサー ━━━━
-
-      // ━━━━ R7-17: 就業時間・注意事項 ━━━━
-      var ns=s(f(8),F_NTICE,CL);
+      // ━━━━ 行8-18: 就業時間・注意事項 ━━━━
       var ntxts=[
         '就業時間：始業 午前8時00分　終業 午後5時00分　休憩 正午1時間（午前10時・午後3時 各15分）　実働 7時間30分',
         '─　注　意　事　項　─',
@@ -423,115 +421,104 @@
         '８．不安全行動や軽率な行動はしないこと。',
         '９．残業及び休日作業の場合には事前に稟議書にて会社決裁を受けること。',
       ];
-      ntxts.forEach(function(txt,i){ var r=7+i; W(r,1,txt,ns); M(r,1,r,10); });
+      ntxts.forEach(function(txt,i){
+        var rn = 8 + i;
+        ws.getRow(rn).height = 9;
+        setCell(rn,2,txt,{fill:fill('FFFEFCE8'),font:font(8),align:align('left','middle')});
+        merge(rn,2,rn,11);
+      });
 
-      // ━━━━ R18: 車両種別 ━━━━
-      W(18,7,'車両種別', s(f(8,true),F_GRAY,CC,bdT)); M(18,7,18,8);
-      W(18,8,'',s(null,F_GRAY,null,bdT));
-      W(18,9,carType, s(f(9,true),null,CC,bdT)); M(18,9,18,10);
-      W(18,10,'',s(null,null,null,bdT));
+      // ━━━━ 行19: 車両種別 ━━━━
+      ws.getRow(19).height = 13;
+      setCell(19,8,'車両種別',{fill:fill('FFE5E7EB'),font:font(8,true),align:align('center','middle'),border:bdAll}); merge(19,8,19,9);
+      setCell(19,9,'',{fill:fill('FFE5E7EB'),border:bdAll});
+      setCell(19,10,carType,{font:font(9,true),align:align('center','middle'),border:bdAll}); merge(19,10,19,11);
+      setCell(19,11,'',{border:bdAll});
 
-      // ━━━━ R19: テーブルヘッダー ━━━━
-      var hSt=s(f(9,true,true),F_HDR,CW,bdM);
-      var hdrs=[
-        [1,'月\n日'],[2,'出欠\n時間'],[3,'労働\n時間'],[4,'現　　場　　名'],
-        [5,'残業\n開始'],[6,'残業\n終了'],[7,'現場まで\nの距離'],[8,'通勤\n状況'],[9,'交通費\n等'],[10,'他']
-      ];
-      hdrs.forEach(function(x){ W(19,x[0],x[1],hSt); });
+      // ━━━━ 行20: テーブルヘッダー ━━━━
+      ws.getRow(20).height = 28;
+      var hdrFill = fill('FF2563EB');
+      var hdrFont = font(9,true,'FFFFFFFF');
+      var hdrAlign = align('center','middle',true);
+      var hdrDefs = [[2,'月・日'],[3,'出欠\n時間'],[4,'労働\n時間'],[5,'現　　場　　名'],[6,'残業\n開始'],[7,'残業\n終了'],[8,'現場まで\nの距離'],[9,'通勤\n状況'],[10,'交通費\n等'],[11,'他']];
+      hdrDefs.forEach(function(x){
+        setCell(20,x[0],x[1],{fill:hdrFill,font:hdrFont,align:hdrAlign,border:bdMed});
+      });
 
-      // ━━━━ R20+: 日次データ ━━━━
+      // ━━━━ 行21+: 日次データ ━━━━
       for(var day=1; day<=daysInMonth; day++){
-        var r=19+day;
-        var ds=year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
-        var dow=new Date(ds+'T00:00:00').getDay();
-        var dateLabel=(day===1)?parseFloat(month+'.1'):day;
-        var rf=(dow===0)?F_SUN:(dow===6)?F_SAT:null;
+        var rn = 20 + day;
+        ws.getRow(rn).height = 14;
+        var ds = year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+        var dow = new Date(ds+'T00:00:00').getDay();
+        var dateLabel = (day===1) ? parseFloat(month+'.1') : day;
+        var rowFillArgb = (dow===0) ? 'FFFEE2E2' : (dow===6) ? 'FFDBEAFE' : null;
+        var rf = rowFillArgb ? fill(rowFillArgb) : null;
 
-        // スタイルを都度生成（ループ内function宣言を避ける）
-        var stC={font:f(9),alignment:CC,border:bdT}; if(rf) stC.fill=rf;
-        var stL={font:f(9),alignment:CL,border:bdT}; if(rf) stL.fill=rf;
-        var stR={font:f(9),alignment:CR,border:bdT}; if(rf) stR.fill=rf;
-        // 左端セル（月・日列）は左辺を太線に
-        var stD={font:f(9),alignment:CC,border:{top:T,bottom:T,left:M_,right:T}}; if(rf) stD.fill=rf;
+        function sc(col, val, h, isLeft){
+          var bd = isLeft ? {top:bThin,bottom:bThin,left:bMedium,right:bThin} : bdAll;
+          var opts = {font:font(9), align:align(h||'center','middle'), border:bd};
+          if(rf) opts.fill = rf;
+          setCell(rn, col, val, opts);
+        }
 
-        var rec=recMap[ds];
-        W(r,1,dateLabel,stD);
+        sc(2, dateLabel, 'center', true);
 
+        var rec = recMap[ds];
         if(!rec){
-          [2,3,4,5,6,7,8,9,10].forEach(function(c){ W(r,c,'',stL); });
+          for(var c=3; c<=11; c++) sc(c, null, 'left', false);
           continue;
         }
 
-        var attTime='',workHours='';
-        if(rec.attendance==='終日')      {attTime='8:00～17:00'; workHours=(rec.workDays||1)*7.5;}
-        else if(rec.attendance==='午前') {attTime='8:00～12:00'; workHours=3.75;}
-        else if(rec.attendance==='午後') {attTime='13:00～17:00';workHours=3.75;}
-        else if(rec.attendance==='休み') {attTime='休み';}
+        var attTime='', workHours=null;
+        if(rec.attendance==='終日')      { attTime='8:00～17:00'; workHours=(rec.workDays||1)*7.5; }
+        else if(rec.attendance==='午前') { attTime='8:00～12:00'; workHours=3.75; }
+        else if(rec.attendance==='午後') { attTime='13:00～17:00'; workHours=3.75; }
+        else if(rec.attendance==='休み') { attTime='休み'; }
 
-        var otStart='',otEnd='';
-        if(rec.overtime==='あり'){otStart=rec.otStart||'';otEnd=rec.otEnd||'';}
+        var otStart='', otEnd='';
+        if(rec.overtime==='あり'){ otStart=rec.otStart||''; otEnd=rec.otEnd||''; }
 
-        var dist=(rec.commuteGenba&&rec.commuteGenba!=='0')?rec.commuteGenba+'km':'';
-        var hasCarpool=(rec.passengers&&rec.passengers.trim()!=='')||(rec.driver&&rec.driver!==userName);
-        var commute=dist?(hasCarpool?'同乗有':'同乗無'):'';
+        var dist = (rec.commuteGenba&&rec.commuteGenba!=='0') ? rec.commuteGenba+'km' : '';
+        var hasCarpool = (rec.passengers&&rec.passengers.trim()!=='') || (rec.driver&&rec.driver!==userName);
+        var commute = dist ? (hasCarpool?'同乗有':'同乗無') : '';
 
-        W(r,2,attTime,                            stC);
-        W(r,3,workHours===''?'':workHours,        stR);
-        W(r,4,rec.site||'',                       stL);
-        W(r,5,otStart,                            stC);
-        W(r,6,otEnd,                              stC);
-        W(r,7,dist,                               stC);
-        W(r,8,commute,                            stC);
-        W(r,9,'',                                 stC);
-        W(r,10,'',                                stC);
+        sc(3, attTime,   'center', false);
+        sc(4, workHours, 'right',  false);
+        sc(5, rec.site||'', 'left', false);
+        sc(6, otStart,   'center', false);
+        sc(7, otEnd,     'center', false);
+        sc(8, dist,      'center', false);
+        sc(9, commute,   'center', false);
+        sc(10, null,     'center', false);
+        sc(11, null,     'center', false);
       }
 
       // ━━━━ フッター ━━━━
-      var fR=20+daysInMonth;
-      var ftC=s(f(9),F_GRAY,CC,{top:M_,bottom:M_,left:M_,right:T});
-      var ftN=s(f(9),F_GRAY,CC,{top:M_,bottom:M_,left:T,right:T});
-      var ftR=s(f(10,true),F_GRAY,CR,{top:M_,bottom:M_,left:T,right:M_});
-      W(fR,1,'合　計', s(f(9,true),F_GRAY,CC,{top:M_,bottom:M_,left:M_,right:T}));
-      [2,3,5,6,7,8,9].forEach(function(c){W(fR,c,'',ftN);});
-      W(fR,4,totalWorkHours,ftR);
-      W(fR,10,'',s(f(9),F_GRAY,CC,{top:M_,bottom:M_,left:T,right:M_}));
-      W(fR+1,3,'（単位：時間）',s(f(8),null,CL));
-      M(fR+1,3,fR+1,5);
+      var fR = 21 + daysInMonth;
+      ws.getRow(fR).height = 16;
+      var ftFill = fill('FFE5E7EB');
+      var ftBd   = {top:bMedium,bottom:bMedium,left:bThin,right:bThin};
+      var ftBdL  = {top:bMedium,bottom:bMedium,left:bMedium,right:bThin};
+      var ftBdR  = {top:bMedium,bottom:bMedium,left:bThin,right:bMedium};
+      setCell(fR,2,'合　計',{fill:ftFill,font:font(10,true),align:align('center','middle'),border:ftBdL});
+      setCell(fR,3,null,    {fill:ftFill,border:ftBd});
+      setCell(fR,4,totalWorkHours,{fill:ftFill,font:font(11,true),align:align('right','middle'),border:ftBd});
+      for(var fc=5; fc<=10; fc++) setCell(fR,fc,null,{fill:ftFill,border:ftBd});
+      setCell(fR,11,null,   {fill:ftFill,border:ftBdR});
+      ws.getRow(fR+1).height = 10;
+      setCell(fR+1,3,'（単位：時間）',{font:font(8),align:align('left','middle')});
+      merge(fR+1,3,fR+1,5);
 
-      // ━━━━ シート設定 ━━━━
-      ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:fR+1,c:10}});
-      ws['!merges']=merges;
-      ws['!cols']=[
-        {wch:0.5}, // A 余白
-        {wch:6},   // B 月・日
-        {wch:13},  // C 出欠時間
-        {wch:7},   // D 労働時間
-        {wch:22},  // E 現場名
-        {wch:8},   // F 残業開始
-        {wch:8},   // G 残業終了
-        {wch:9},   // H 現場まで
-        {wch:8},   // I 通勤状況
-        {wch:8},   // J 交通費等
-        {wch:5},   // K 他
-      ];
-      var rowH=[];
-      rowH[0] ={hpt:24}; // タイトル
-      rowH[1] ={hpt:18}; // 氏名
-      rowH[2] ={hpt:5};  // spacer
-      rowH[3] ={hpt:13}; // サマリー見出し
-      rowH[4] ={hpt:13}; // サマリーサブラベル
-      rowH[5] ={hpt:16}; // サマリー値
-      rowH[6] ={hpt:5};  // spacer
-      for(var i=7;i<=17;i++) rowH[i]={hpt:9};
-      rowH[18]={hpt:13}; // 車両種別
-      rowH[19]={hpt:28}; // テーブルヘッダー
-      for(var d=1;d<=daysInMonth;d++) rowH[19+d]={hpt:14};
-      rowH[fR]  ={hpt:16};
-      rowH[fR+1]={hpt:10};
-      ws['!rows']=rowH;
-      ws['!pageSetup']={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1};
-      ws['!margins']={left:0.39,right:0.39,top:0.59,bottom:0.59,header:0.2,footer:0.2};
-      return ws;
+      // ━━━━ 印刷設定 ━━━━
+      ws.pageSetup = {
+        paperSize: 9,
+        orientation: 'portrait',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 1,
+        margins: {left:0.39, right:0.39, top:0.59, bottom:0.59, header:0.2, footer:0.2},
+      };
     }
 
     function loadUsers(){
