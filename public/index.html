@@ -798,6 +798,36 @@
       updateSubmitLabel();
     }
 
+    /* 日付移動 */
+    function navigateDate(delta){
+      var name=document.getElementById('user').value;
+      var date=document.getElementById('date').value;
+      if(!name || !date) return;
+      var d=new Date(date+'T00:00:00');
+      d.setDate(d.getDate()+delta);
+      var newDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      document.getElementById('date').value=newDate;
+      loadExisting();
+      toast((delta>0?'翌日':'前日')+'（'+newDate+'）', 1200);
+    }
+
+    /* スワイプ検出 */
+    var swipeX=0, swipeY=0;
+    document.addEventListener('touchstart', function(e){
+      swipeX=e.touches[0].clientX; swipeY=e.touches[0].clientY;
+    },{passive:true});
+    document.addEventListener('touchend', function(e){
+      if(document.getElementById('calcModal').classList.contains('show')) return;
+      var dx=e.changedTouches[0].clientX-swipeX;
+      var dy=e.changedTouches[0].clientY-swipeY;
+      if(Math.abs(dx)<60) return;
+      if(Math.abs(dy)>Math.abs(dx)*0.75) return;
+      var name=document.getElementById('user').value;
+      var date=document.getElementById('date').value;
+      if(!name||!date) return;
+      navigateDate(dx>0?1:-1);
+    },{passive:true});
+
     function clearInputs(){
       document.querySelectorAll('.opt.on').forEach(function(b){b.classList.remove('on');});
       // 残業
