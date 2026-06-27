@@ -285,13 +285,15 @@
         users.forEach(function(u){ recsByUser[u.name] = []; });
         allRecs.forEach(function(r){ if(recsByUser[r.name]) recsByUser[r.name].push(r); });
         var reiwa = year - 2018;
-        var wb = XLSX.utils.book_new();
+        var wb = {SheetNames:[], Sheets:{}};
         users.forEach(function(u){
           var ws = buildTimesheetSheet(u.name, recsByUser[u.name] || [], year, month, reiwa);
-          XLSX.utils.book_append_sheet(wb, ws, u.name.slice(0, 31));
+          var sheetName = u.name.slice(0, 31);
+          wb.SheetNames.push(sheetName);
+          wb.Sheets[sheetName] = ws;
         });
         var fileName = '出勤簿_令和' + reiwa + '年' + month + '月分.xlsx';
-        XLSX.writeFile(wb, fileName, { cellStyles: true });
+        XLSX.writeFile(wb, fileName);
         toast(users.length + '名分の出勤簿を出力しました');
       } catch(e){ toast('エラー: ' + e.message); }
     }
