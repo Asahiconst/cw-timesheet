@@ -156,6 +156,7 @@
           <div class="export-row no-print">
             <button class="btn sm green" onclick="exportCSV()">CSV出力</button>
             <button class="btn sm gray" onclick="exportPDF()">PDF出力（印刷）</button>
+            <button class="btn sm green" onclick="exportTimesheetFromFilter()">出勤簿Excel出力</button>
           </div>
           <div class="scroll">
             <table id="recTable">
@@ -298,9 +299,15 @@
       }
     }
 
-    async function exportTimesheet(){
-      var year = parseInt(document.getElementById('tsYear').value);
-      var month = parseInt(document.getElementById('tsMonth').value);
+    function exportTimesheetFromFilter(){
+      var from = document.getElementById('fFrom').value;
+      var d = from ? new Date(from+'T00:00:00') : new Date();
+      exportTimesheet(d.getFullYear(), d.getMonth()+1);
+    }
+
+    async function exportTimesheet(yr, mo){
+      var year  = yr  || parseInt(document.getElementById('tsYear').value);
+      var month = mo  || parseInt(document.getElementById('tsMonth').value);
       var status = document.getElementById('tsStatus');
       status.textContent = 'データ取得中...';
       try {
@@ -308,7 +315,7 @@
         if(users.length === 0){ status.textContent = '有効なユーザーがいません'; return; }
         var daysInMonth = new Date(year, month, 0).getDate();
         var fromDate = year + '-' + String(month).padStart(2,'0') + '-01';
-        var toDate   = year + '-' + String(month).padStart(2,'0') + '-' + daysInMonth;
+        var toDate   = year + '-' + String(month).padStart(2,'0') + '-' + String(daysInMonth).padStart(2,'0');
         var allRecs = await api('/admin/records?from=' + fromDate + '&to=' + toDate);
         var recsByUser = {};
         users.forEach(function(u){ recsByUser[u.name] = []; });
@@ -320,7 +327,7 @@
           XLSX.utils.book_append_sheet(wb, ws, u.name.slice(0, 31));
         });
         var fileName = '出勤簿_令和' + reiwa + '年' + month + '月分.xlsx';
-        XLSX.writeFile(wb, fileName);
+        XLSX.writeFile(wb, fileName, { cellStyles: true });
         status.textContent = users.length + '名分のシートを出力しました';
       } catch(e){ status.textContent = 'エラー: ' + e.message; toast('エラー: ' + e.message); }
     }
@@ -330,75 +337,168 @@
       var recMap = {};
       records.forEach(function(r){ recMap[r.date] = r; });
 
-      // 車両種別（月で最多）
       var carCounts = {};
-      records.forEach(function(r){ if(r.carType){ carCounts[r.carType] = (carCounts[r.carType]||0)+1; } });
-      var carType = Object.keys(carCounts).sort(function(a,b){ return carCounts[b]-carCounts[a]; })[0] || '';
+      records.forEach(function(r){ if(r.carType) carCounts[r.carType]=(carCounts[r.carType]||0)+1; });
+      var carType = Object.keys(carCounts).sort(function(a,b){return carCounts[b]-carCounts[a];})[0]||'';
 
-      // 合計
-      var totalWorkDays = 0;
-      records.forEach(function(r){ totalWorkDays += (r.workDays || 0); });
-      var totalWorkHours = Math.round(totalWorkDays * 75) / 10;
+      var totalWorkDays=0;
+      records.forEach(function(r){ totalWorkDays+=(r.workDays||0); });
+      var totalWorkHours = Math.round(totalWorkDays*75)/10;
 
-      var aoa = [
-        ['', '令和'+reiwa+'年'+month+'月分出勤簿　　旭建設株式会社　'],
-        ['', '', '', userName, '', '（作業員用）'],
-        [],
-        ['', '', '', '労働日数（合計）', '', '残業時間（合計）'],
-        ['', '', '', '通常出勤', '休日出勤', '普通時間', '深夜時間', '', '有給', '公休', '振替'],
-        ['', '', '', totalWorkDays, 0, 0, 0, '', 0, 0, 0],
-        [],
-        ['', '当社の就業時間は、下記の通りです。'],
-        ['', '始業 　　午前　8時00分　　　　　　終業　午後　5時00分'],
-        ['', '休憩 　　正午　1時間　　　　午前10時から15分間　　　　午後3時から15分間'],
-        ['', '実働 　　7時間30分'],
-        ['', '─　注　意　事　項　─'],
-        ['', '１．', '作業責任者の指示、注意事項を遵守すること。'],
-        ['', '２．', '作業中は、保護具アゴひもを必ず着用し、くわえタバコやポイ捨てはしないこと。'],
-        ['', '３．', '重機の運転は、免許所持者で現場代理人の許可を受けたものとし、免許証は所持すること。'],
-        ['', '４．', '機械・器具は、毎朝始業前点検を実施すること。'],
-        ['', '５．', '機械・器具は、作業終了後指定場所に整理整頓して保管収納すること。５S活動の推進'],
-        ['', '６．', '作業中の傷病については、些細なことでも責任所に申し出ること。'],
-        ['', '７．', '報告連絡相談を必ず行うこと。'],
-        ['', '８．', '不安全行動や軽率な行動はしないこと。'],
-        ['', '９．', '残業及び休日作業の場合には、事前に稟議書にて会社決裁を受けてください。'],
-        ['', '', '', '', '', '', '', '', '', carType],
-        ['', '', '月・日', '出欠時間', '労働時間', '現場名', '残業時間(開始)', '残業時間(終了)', '現場までの距離', '通勤状況', '他'],
-      ];
+      var ws={}, merges=[], maxR=0;
 
-      for(var day = 1; day <= daysInMonth; day++){
-        var dateStr = year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
-        var rec = recMap[dateStr];
-        var dateLabel = day === 1 ? parseFloat(month + '.1') : day;
+      function sc(r,col,v,s){
+        if(r>maxR) maxR=r;
+        var ref=XLSX.utils.encode_cell({r:r,c:col});
+        var t=(typeof v==='number')?'n':'s';
+        ws[ref]={v:(v===null||v===undefined)?'':v, t:t, s:s||{}};
+      }
+      function mg(r1,c1,r2,c2){ merges.push({s:{r:r1,c:c1},e:{r:r2,c:c2}}); }
 
-        if(!rec){ aoa.push(['', '', dateLabel, '', '', '', '', '', '', '', '']); continue; }
+      // ─── スタイル定義 ───
+      var TN={style:'thin',color:{rgb:'94A3B8'}};
+      var BK={style:'thin',color:{rgb:'334155'}};
+      var bdThin={top:TN,bottom:TN,left:TN,right:TN};
+      var bdBold={top:BK,bottom:BK,left:BK,right:BK};
+      var fillBlue={patternType:'solid',fgColor:{rgb:'BFDBFE'}};
+      var fillLBlue={patternType:'solid',fgColor:{rgb:'EFF6FF'}};
+      var fillGray={patternType:'solid',fgColor:{rgb:'F1F5F9'}};
+      var fillYellow={patternType:'solid',fgColor:{rgb:'FEFCE8'}};
+      var fillRed={patternType:'solid',fgColor:{rgb:'FEE2E2'}};
+      var fillSatBlue={patternType:'solid',fgColor:{rgb:'EFF6FF'}};
+      var fillHdrBlue={patternType:'solid',fgColor:{rgb:'DBEAFE'}};
+      var CC={horizontal:'center',vertical:'center'};
+      var CL={horizontal:'left',vertical:'center'};
+      var CR={horizontal:'right',vertical:'center'};
+      var CW={horizontal:'center',vertical:'center',wrapText:true};
 
-        var attTime = '', workHours = '';
-        if(rec.attendance === '終日'){      attTime = '8：00～17：00'; workHours = (rec.workDays||1)*7.5; }
-        else if(rec.attendance === '午前'){ attTime = '8：00～12：00'; workHours = 3.75; }
-        else if(rec.attendance === '午後'){ attTime = '13：00～17：00'; workHours = 3.75; }
-        else if(rec.attendance === '休み'){ attTime = '休み'; }
-
-        var otStart = '', otEnd = '';
-        if(rec.overtime === 'あり'){ otStart = rec.otStart || ''; otEnd = rec.otEnd || ''; }
-
-        var dist = (rec.commuteGenba && rec.commuteGenba !== '0') ? rec.commuteGenba + 'km' : '';
-        var hasCarpool = (rec.passengers && rec.passengers.trim() !== '') ||
-                         (rec.driver && rec.driver !== userName);
-        var commute = dist ? (hasCarpool ? '同乗有' : '同乗無') : '';
-
-        aoa.push(['', '', dateLabel, attTime, workHours === ''?'':workHours, rec.site||'', otStart, otEnd, dist, commute, '']);
+      function fnt(sz,bold){ return {name:'MS Gothic',sz:sz,bold:!!bold}; }
+      function st(font,fill,align,border){
+        var s={font:font};
+        if(fill) s.fill=fill;
+        if(align) s.alignment=align;
+        if(border) s.border=border;
+        return s;
       }
 
-      // フッター
-      aoa.push(['', '', '', '計', totalWorkHours, '', '', 0, '', '', '']);
-      aoa.push(['', '', '', '', '（時間）', '', '', '', '', '', '']);
+      // ─── R0: タイトル ───
+      sc(0,1,'令和'+reiwa+'年'+month+'月分出勤簿　　旭建設株式会社',
+        st(fnt(13,true),fillBlue,CC,{bottom:{style:'medium',color:{rgb:'1E40AF'}}}));
+      mg(0,1,0,10);
 
-      var ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = [
-        {wch:3},{wch:8},{wch:8},{wch:16},{wch:8},
-        {wch:32},{wch:12},{wch:12},{wch:16},{wch:10},{wch:10}
+      // ─── R1: 氏名 ───
+      sc(1,2,userName, st(fnt(12,true),null,CL));
+      mg(1,2,1,5);
+      sc(1,6,'（作業員用）', st(fnt(9),null,CL));
+
+      // ─── R3-5: 集計 ───
+      sc(3,2,'労働日数（合計）', st(fnt(8,true),fillGray,CC,{bottom:BK})); mg(3,2,3,4);
+      sc(3,5,'残業時間（合計）', st(fnt(8,true),fillGray,CC,{bottom:BK})); mg(3,5,3,7);
+      sc(3,8,'その他', st(fnt(8,true),fillGray,CC,{bottom:BK})); mg(3,8,3,10);
+      var sublabels=[['通常出勤',2],['休日出勤',3],['普通時間',5],['深夜時間',6],['有給',8],['公休',9],['振替',10]];
+      sublabels.forEach(function(x){ sc(4,x[1],x[0],st(fnt(8),fillGray,CC,bdThin)); });
+      var subvals=[[totalWorkDays,2],[0,3],[0,5],[0,6],[0,8],[0,9],[0,10]];
+      subvals.forEach(function(x){ sc(5,x[1],x[0],st(fnt(9,true),fillGray,CC,bdThin)); });
+
+      // ─── R7-20: 注意事項 ───
+      var notices=[
+        '就業時間：始業 午前8時00分　終業 午後5時00分　休憩 正午1時間（午前10時・午後3時 各15分）　実働7時間30分',
+        '─　注　意　事　項　─',
+        '１．作業責任者の指示、注意事項を遵守すること。',
+        '２．作業中は保護具アゴひもを必ず着用し、くわえタバコやポイ捨てはしないこと。',
+        '３．重機の運転は免許所持者で現場代理人の許可を受けたものとし、免許証は所持すること。',
+        '４．機械・器具は毎朝始業前点検を実施すること。',
+        '５．機械・器具は作業終了後指定場所に整理整頓して保管収納すること（５S活動の推進）。',
+        '６．作業中の傷病については些細なことでも責任者に申し出ること。',
+        '７．報告連絡相談を必ず行うこと。',
+        '８．不安全行動や軽率な行動はしないこと。',
+        '９．残業及び休日作業は事前に稟議書にて会社決裁を受けること。',
       ];
+      notices.forEach(function(txt,i){
+        var r=7+i;
+        sc(r,1,txt,st(fnt(8),fillYellow,CL));
+        mg(r,1,r,10);
+      });
+
+      // ─── R18: 車両種別 ───
+      sc(18,7,'車両種別', st(fnt(8,true),fillGray,CC,bdThin)); mg(18,7,18,8);
+      sc(18,9,carType, st(fnt(9,true),null,CC,bdThin)); mg(18,9,18,10);
+
+      // ─── R19: 列ヘッダー ───
+      var hdrDefs=[
+        [2,'月・日'],[3,'出欠\n時間'],[4,'労働\n時間'],[5,'現　　場　　名'],
+        [6,'残業\n開始'],[7,'残業\n終了'],[8,'現場まで\nの距離'],[9,'通勤\n状況'],[10,'他']
+      ];
+      hdrDefs.forEach(function(x){
+        sc(19,x[0],x[1], st(fnt(9,true),fillHdrBlue,CW,bdBold));
+      });
+
+      // ─── R20+: 日次データ ───
+      for(var day=1; day<=daysInMonth; day++){
+        var r=19+day;
+        var dateStr=year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+        var dow=new Date(dateStr+'T00:00:00').getDay();
+        var dateLabel=(day===1)?parseFloat(month+'.1'):day;
+        var rowFill=(dow===0)?fillRed:(dow===6)?fillSatBlue:null;
+
+        function ds(align){ return st(fnt(9),rowFill,align||CC,bdThin); }
+
+        var rec=recMap[dateStr];
+        sc(r,2,dateLabel,ds(CC));
+
+        if(!rec){
+          [3,4,5,6,7,8,9,10].forEach(function(col){ sc(r,col,'',ds(CL)); });
+          continue;
+        }
+
+        var attTime='',workHours='';
+        if(rec.attendance==='終日')      { attTime='8：00～17：00'; workHours=(rec.workDays||1)*7.5; }
+        else if(rec.attendance==='午前') { attTime='8：00～12：00'; workHours=3.75; }
+        else if(rec.attendance==='午後') { attTime='13：00～17：00'; workHours=3.75; }
+        else if(rec.attendance==='休み') { attTime='休み'; }
+
+        var otStart='',otEnd='';
+        if(rec.overtime==='あり'){ otStart=rec.otStart||''; otEnd=rec.otEnd||''; }
+
+        var dist=(rec.commuteGenba&&rec.commuteGenba!=='0')?rec.commuteGenba+'km':'';
+        var hasCarpool=(rec.passengers&&rec.passengers.trim()!=='')||(rec.driver&&rec.driver!==userName);
+        var commute=dist?(hasCarpool?'同乗有':'同乗無'):'';
+
+        sc(r,3,attTime,       ds(CC));
+        sc(r,4,workHours===''?'':workHours, ds(CR));
+        sc(r,5,rec.site||'',  ds(CL));
+        sc(r,6,otStart,       ds(CC));
+        sc(r,7,otEnd,         ds(CC));
+        sc(r,8,dist,          ds(CC));
+        sc(r,9,commute,       ds(CC));
+        sc(r,10,'',           ds(CC));
+      }
+
+      // ─── フッター ───
+      var fR=20+daysInMonth;
+      var ftSt=st(fnt(9,true),fillGray,CC,bdBold);
+      [2,3,4,5,6,7,8,9,10].forEach(function(col){ sc(fR,col,'',st(fnt(9),fillGray,CC,bdThin)); });
+      sc(fR,3,'計',ftSt);
+      sc(fR,4,totalWorkHours, st(fnt(10,true),fillGray,CR,bdBold));
+      sc(fR+1,4,'（時間）', st(fnt(8),null,CC));
+
+      // ─── シート設定 ───
+      ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:fR+1,c:10}});
+      ws['!merges']=merges;
+      ws['!cols']=[
+        {wch:2},{wch:2},{wch:7},{wch:14},{wch:7},
+        {wch:24},{wch:9},{wch:9},{wch:10},{wch:8},{wch:6}
+      ];
+      var rowH=[];
+      rowH[0]={hpt:20}; rowH[1]={hpt:17}; rowH[2]={hpt:5};
+      rowH[3]={hpt:13}; rowH[4]={hpt:12}; rowH[5]={hpt:13}; rowH[6]={hpt:5};
+      for(var i=7;i<=17;i++) rowH[i]={hpt:10};
+      rowH[18]={hpt:13}; rowH[19]={hpt:24};
+      for(var d=1;d<=daysInMonth;d++) rowH[19+d]={hpt:12};
+      rowH[fR]={hpt:13};
+      ws['!rows']=rowH;
+      ws['!pageSetup']={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1};
+      ws['!margins']={left:0.5,right:0.5,top:0.75,bottom:0.75,header:0.3,footer:0.3};
       return ws;
     }
 

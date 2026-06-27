@@ -230,7 +230,10 @@
       <div class="item">
         <div class="lbl">日付</div>
         <div class="ctrl">
-          <input type="date" id="date" onchange="loadExisting()">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="date" id="date" onchange="loadExisting();updateDow();" style="flex:1;min-width:0;">
+            <span id="dowLabel" style="font-size:15px;font-weight:800;white-space:nowrap;min-width:3.2em;text-align:center;"></span>
+          </div>
           <div class="date-btns">
             <button class="sub-btn" type="button" onclick="copyPrevious()">前回コピー</button>
             <div style="position:relative; flex:1;">
@@ -418,6 +421,7 @@
       var t = new Date();
       document.getElementById('date').value =
         t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+      updateDow();
 
       ['otSH','otEH'].forEach(function(id){
         var s=document.getElementById(id);
@@ -798,6 +802,35 @@
       updateSubmitLabel();
     }
 
+    /* 祝日リスト (2025-2027) */
+    var JP_HOLIDAYS = new Set([
+      '2025-01-01','2025-01-13','2025-02-11','2025-02-23','2025-02-24',
+      '2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-05-06',
+      '2025-07-21','2025-08-11','2025-09-15','2025-09-23','2025-10-13',
+      '2025-11-03','2025-11-23','2025-11-24',
+      '2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20',
+      '2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06',
+      '2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23',
+      '2026-10-12','2026-11-03','2026-11-23',
+      '2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22',
+      '2027-04-29','2027-05-03','2027-05-04','2027-05-05',
+      '2027-07-19','2027-08-11','2027-09-20','2027-09-23',
+      '2027-10-11','2027-11-03','2027-11-23',
+    ]);
+
+    function updateDow(){
+      var val=document.getElementById('date').value;
+      var el=document.getElementById('dowLabel');
+      if(!val){el.textContent='';el.style.color='';return;}
+      var d=new Date(val+'T00:00:00');
+      var dow=d.getDay();
+      var isHol=JP_HOLIDAYS.has(val);
+      el.textContent='（'+['日','月','火','水','木','金','土'][dow]+'）';
+      if(dow===0||isHol){el.style.color='#ef4444';}
+      else if(dow===6){el.style.color='#3b82f6';}
+      else{el.style.color='';}
+    }
+
     /* 日付移動 */
     function navigateDate(delta){
       var name=document.getElementById('user').value;
@@ -807,11 +840,12 @@
       d.setDate(d.getDate()+delta);
       var newDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
       document.getElementById('date').value=newDate;
+      updateDow();
       loadExisting();
       toast((delta>0?'翌日':'前日')+'（'+newDate+'）', 1200);
     }
 
-    /* スワイプ検出 */
+    /* スワイプ検出：右スワイプ=前日、左スワイプ=翌日 */
     var swipeX=0, swipeY=0;
     document.addEventListener('touchstart', function(e){
       swipeX=e.touches[0].clientX; swipeY=e.touches[0].clientY;
@@ -825,7 +859,7 @@
       var name=document.getElementById('user').value;
       var date=document.getElementById('date').value;
       if(!name||!date) return;
-      navigateDate(dx>0?1:-1);
+      navigateDate(dx>0?-1:1);
     },{passive:true});
 
     function clearInputs(){
