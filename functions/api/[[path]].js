@@ -1,5 +1,68 @@
 function uuid() { return crypto.randomUUID(); }
 
+function base64url(input) {
+  if (input instanceof Uint8Array) {
+    let s = '';
+    for (const b of input) s += String.fromCharCode(b);
+    return btoa(s).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  }
+  return btoa(input).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+async function buildLwJwt(env) {
+  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const now = Math.floor(Date.now() / 1000);
+  const payload = base64url(JSON.stringify({
+    iss: env.LW_CLIENT_ID,
+    sub: env.LW_SERVICE_ACCOUNT,
+    iat: now,
+    exp: now + 3600,
+  }));
+  const signingInput = `${header}.${payload}`;
+  const pem = env.LW_PRIVATE_KEY.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\r?\n/g, '');
+  const keyBytes = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey(
+    'pkcs8', keyBytes.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput));
+  return `${signingInput}.${base64url(new Uint8Array(sig))}`;
+}
+
+async function notifyLineWorks(env, d) {
+  if (!env.LW_CLIENT_ID || !env.LW_PRIVATE_KEY) return;
+  try {
+    const jwt = await buildLwJwt(env);
+    const tokenRes = await fetch('https://auth.worksmobile.com/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt,
+        client_id: env.LW_CLIENT_ID,
+        client_secret: env.LW_CLIENT_SECRET,
+        scope: 'bot',
+      }),
+    });
+    const { access_token } = await tokenRes.json();
+    if (!access_token) return;
+
+    const lines = ['【出勤登録通知】', `${d.userName} さんが登録しました`, '', `日付: ${d.date}`, `区分: ${d.attendance}`];
+    if (d.site) lines.push(`現場: ${d.site}`);
+    if (d.overtime) lines.push(`残業: ${d.overtime}`);
+    if (d.overtimeStart && d.overtimeEnd) lines.push(`残業時間: ${d.overtimeStart}〜${d.overtimeEnd}`);
+
+    await fetch(`https://www.worksapis.com/v1.0/bots/${env.LW_BOT_ID}/users/${encodeURIComponent(env.LW_NOTIFY_USER)}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access_token}` },
+      body: JSON.stringify({ content: { type: 'text', text: lines.join('\n') } }),
+    });
+  } catch (e) {
+    console.error('LINE WORKS notify failed:', e);
+  }
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -11,14 +74,14 @@ function nowJST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }).replace(' ', 'T');
 }
 
-async function requireAdmin(request, env) {
+async function getAdminRole(request, env) {
   const auth = request.headers.get('Authorization') || '';
   const token = auth.replace('Bearer ', '').trim();
-  if (!token) return false;
+  if (!token) return null;
   const row = await env.DB.prepare(
-    "SELECT 1 FROM sessions WHERE token = ? AND created_at > datetime('now', '-24 hours')"
+    "SELECT a.role FROM sessions s JOIN admins a ON s.login_id = a.login_id WHERE s.token = ? AND s.created_at > datetime('now', '-24 hours')"
   ).bind(token).first();
-  return !!row;
+  return row ? (row.role || 'genba') : null;
 }
 
 export async function onRequest({ request, env }) {
@@ -85,6 +148,7 @@ export async function onRequest({ request, env }) {
       d.commuteGenba || '', d.commuteShugo || '',
       d.driver || '', (d.passengers || []).join('、')
     ).run();
+    await notifyLineWorks(env, d);
     return json({ ok: true, id });
   }
 
@@ -141,18 +205,19 @@ export async function onRequest({ request, env }) {
   if (method === 'POST' && path === '/admin/login') {
     const { id, pass } = await request.json();
     const row = await env.DB.prepare(
-      'SELECT 1 FROM admins WHERE login_id = ? AND password = ?'
+      'SELECT role FROM admins WHERE login_id = ? AND password = ?'
     ).bind(id, pass).first();
     if (!row) return json({ ok: false });
     const token = uuid();
-    await env.DB.prepare('INSERT INTO sessions (token, created_at) VALUES (?, ?)')
-      .bind(token, nowJST()).run();
-    return json({ ok: true, token });
+    await env.DB.prepare('INSERT INTO sessions (token, login_id, created_at) VALUES (?, ?, ?)')
+      .bind(token, id, nowJST()).run();
+    return json({ ok: true, token, role: row.role || 'genba' });
   }
 
   // ── 管理者 API（認証必須）────────────────────────────────
 
-  if (!(await requireAdmin(request, env))) {
+  const adminRole = await getAdminRole(request, env);
+  if (!adminRole) {
     return json({ error: 'Unauthorized' }, 401);
   }
 
@@ -226,13 +291,17 @@ export async function onRequest({ request, env }) {
 
   if (method === 'GET' && path === '/admin/records') {
     const name = url.searchParams.get('name') || '';
-    const from = url.searchParams.get('from') || '';
-    const to   = url.searchParams.get('to')   || '';
+    const site     = url.searchParams.get('site')     || '';
+    const approved = url.searchParams.get('approved');
+    const from     = url.searchParams.get('from')     || '';
+    const to       = url.searchParams.get('to')       || '';
     let q = 'SELECT * FROM records WHERE 1=1';
     const binds = [];
-    if (name) { q += ' AND user_name = ?'; binds.push(name); }
-    if (from) { q += ' AND date >= ?';     binds.push(from); }
-    if (to)   { q += ' AND date <= ?';     binds.push(to); }
+    if (name)              { q += ' AND user_name = ?';              binds.push(name); }
+    if (site)              { q += " AND site LIKE '%' || ? || '%'";  binds.push(site); }
+    if (approved !== null) { q += ' AND approved = ?';               binds.push(Number(approved)); }
+    if (from)              { q += ' AND date >= ?';                  binds.push(from); }
+    if (to)                { q += ' AND date <= ?';                  binds.push(to); }
     q += ' ORDER BY date DESC, created_at DESC LIMIT 500';
     const stmt = env.DB.prepare(q);
     const { results } = await (binds.length ? stmt.bind(...binds) : stmt).all();
@@ -255,7 +324,17 @@ export async function onRequest({ request, env }) {
       commuteShugo: r.commute_shugo,
       driver: r.driver,
       passengers: r.passengers,
+      approved: r.approved === 1,
     })));
+  }
+
+  const recordApprovedMatch = path.match(/^\/admin\/records\/([^/]+)\/approved$/);
+  if (method === 'PUT' && recordApprovedMatch) {
+    if (adminRole !== 'genba') return json({ error: 'Forbidden' }, 403);
+    const { approved } = await request.json();
+    await env.DB.prepare('UPDATE records SET approved = ? WHERE id = ?')
+      .bind(approved ? 1 : 0, recordApprovedMatch[1]).run();
+    return json({ ok: true });
   }
 
   return json({ error: 'Not found' }, 404);
