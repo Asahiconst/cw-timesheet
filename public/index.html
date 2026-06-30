@@ -821,14 +821,15 @@
     function updateDow(){
       var val=document.getElementById('date').value;
       var el=document.getElementById('dowLabel');
-      if(!val){el.textContent='';el.style.color='';return;}
+      var di=document.getElementById('date');
+      if(!val){el.textContent='';el.style.color='';di.style.color='';return;}
       var d=new Date(val+'T00:00:00');
       var dow=d.getDay();
       var isHol=JP_HOLIDAYS.has(val);
       el.textContent='（'+['日','月','火','水','木','金','土'][dow]+'）';
-      if(dow===0||isHol){el.style.color='#ef4444';}
-      else if(dow===6){el.style.color='#3b82f6';}
-      else{el.style.color='';}
+      var col=(dow===0||isHol)?'#ef4444':(dow===6)?'#3b82f6':'';
+      el.style.color=col;
+      di.style.color=col;
     }
 
     /* 日付移動 */

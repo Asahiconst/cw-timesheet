@@ -495,7 +495,10 @@
 
         var hasOT = (rec.overtime==='あり');
         var otStart='', otEnd='';
-        if(hasOT){ otStart=rec.otStart||''; otEnd=rec.otEnd||''; }
+        if(hasOT){
+          function fmtOT(t){ var m=(t||'').match(/^(\d{1,2})時$/); return m?m[1]+':00':t||''; }
+          otStart=fmtOT(rec.otStart); otEnd=fmtOT(rec.otEnd);
+        }
 
         var attTime='', workHours=null;
         if(rec.attendance==='終日') {
