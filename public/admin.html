@@ -301,6 +301,21 @@
       } catch(e){ toast('エラー: ' + e.message); console.error(e); }
     }
 
+    function isJapaneseHoliday(y, m, d) {
+      var fixed = [[1,1],[2,11],[2,23],[4,29],[5,3],[5,4],[5,5],[8,11],[11,3],[11,23]];
+      for (var i=0; i<fixed.length; i++) { if(m===fixed[i][0]&&d===fixed[i][1]) return true; }
+      function nthMon(y,m,n){ var dow=new Date(y,m-1,1).getDay(); var fm=(dow===1)?1:(dow===0)?2:(9-dow); return fm+7*(n-1); }
+      if(m===1&&d===nthMon(y,1,2)) return true;
+      if(m===7&&d===nthMon(y,7,3)) return true;
+      if(m===9&&d===nthMon(y,9,3)) return true;
+      if(m===10&&d===nthMon(y,10,2)) return true;
+      var shunbun=Math.floor(20.8431+0.242194*(y-1980)-Math.floor((y-1980)/4));
+      if(m===3&&d===shunbun) return true;
+      var shubun=Math.floor(23.2488+0.242194*(y-1980)-Math.floor((y-1980)/4));
+      if(m===9&&d===shubun) return true;
+      return false;
+    }
+
     async function buildTimesheetSheet(wb, userName, records, year, month, reiwa){
       var daysInMonth = new Date(year, month, 0).getDate();
       var recMap = {};
@@ -310,8 +325,16 @@
       records.forEach(function(r){ if(r.carType) carCounts[r.carType]=(carCounts[r.carType]||0)+1; });
       var carType = Object.keys(carCounts).sort(function(a,b){return carCounts[b]-carCounts[a];})[0]||'';
 
-      var totalWorkDays = 0;
-      records.forEach(function(r){ totalWorkDays += (r.workDays||0); });
+      var totalWorkDays = 0, holidayWorkDays = 0;
+      records.forEach(function(r){
+        var dt = new Date(r.date+'T00:00:00');
+        var dow = dt.getDay();
+        var wd = r.workDays||0;
+        totalWorkDays += wd;
+        if(dow===0||dow===6||isJapaneseHoliday(dt.getFullYear(),dt.getMonth()+1,dt.getDate())) holidayWorkDays += wd;
+      });
+      var normalWorkDays = Math.round((totalWorkDays - holidayWorkDays)*10)/10;
+      holidayWorkDays = Math.round(holidayWorkDays*10)/10;
       var totalWorkHours = Math.round(totalWorkDays * 75) / 10;
 
       var ws = wb.addWorksheet(userName.slice(0, 31));
@@ -398,7 +421,7 @@
       var bBotMed = {top:bThin,left:bThin,bottom:bMedium,right:bThin};
       var bBotMedL = {top:bThin,left:bMedium,bottom:bMedium,right:bThin};
       var bBotMedR = {top:bThin,left:bThin,bottom:bMedium,right:bMedium};
-      var svDefs = [[2,totalWorkDays,'left'],[3,0,''],[4,totalWorkDays,''],[5,0,''],[6,0,''],[7,0,''],[8,0,''],[9,0,''],[10,0,''],[11,'','right']];
+      var svDefs = [[2,normalWorkDays,'left'],[3,holidayWorkDays,''],[4,totalWorkDays,''],[5,0,''],[6,0,''],[7,0,''],[8,0,''],[9,0,''],[10,0,''],[11,'','right']];
       svDefs.forEach(function(x, idx){
         var brd = (idx===0) ? bBotMedL : (idx===svDefs.length-1) ? bBotMedR : bBotMed;
         setCell(6,x[0],x[1],{fill:fSum,font:font(10,true),align:align('center','middle'),border:brd});
@@ -423,7 +446,7 @@
       ];
       ntxts.forEach(function(txt,i){
         var rn = 8 + i;
-        ws.getRow(rn).height = 9;
+        ws.getRow(rn).height = 11;
         setCell(rn,2,txt,{fill:fill('FFFEFCE8'),font:font(8),align:align('left','middle')});
         merge(rn,2,rn,11);
       });
@@ -448,7 +471,7 @@
       // ━━━━ 行21+: 日次データ ━━━━
       for(var day=1; day<=daysInMonth; day++){
         var rn = 20 + day;
-        ws.getRow(rn).height = 14;
+        ws.getRow(rn).height = 16;
         var ds = year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
         var dow = new Date(ds+'T00:00:00').getDay();
         var dateLabel = (day===1) ? parseFloat(month+'.1') : day;
@@ -470,14 +493,17 @@
           continue;
         }
 
+        var hasOT = (rec.overtime==='あり');
+        var otStart='', otEnd='';
+        if(hasOT){ otStart=rec.otStart||''; otEnd=rec.otEnd||''; }
+
         var attTime='', workHours=null;
-        if(rec.attendance==='終日')      { attTime='8:00～17:00'; workHours=(rec.workDays||1)*7.5; }
-        else if(rec.attendance==='午前') { attTime='8:00～12:00'; workHours=3.75; }
+        if(rec.attendance==='終日') {
+          attTime = hasOT ? '8:00～'+(otEnd||'17:00') : '8:00～17:00';
+          workHours = 7.5;
+        } else if(rec.attendance==='午前') { attTime='8:00～12:00'; workHours=3.75; }
         else if(rec.attendance==='午後') { attTime='13:00～17:00'; workHours=3.75; }
         else if(rec.attendance==='休み') { attTime='休み'; }
-
-        var otStart='', otEnd='';
-        if(rec.overtime==='あり'){ otStart=rec.otStart||''; otEnd=rec.otEnd||''; }
 
         var dist = (rec.commuteGenba&&rec.commuteGenba!=='0') ? rec.commuteGenba+'km' : '';
         var hasCarpool = (rec.passengers&&rec.passengers.trim()!=='') || (rec.driver&&rec.driver!==userName);
